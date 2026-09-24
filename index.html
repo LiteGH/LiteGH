@@ -13,8 +13,8 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
-  <link id="hljsLightTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-  <link id="hljsDarkTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="not all">
+  <link id="hljsLightTheme" rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <link id="hljsDarkTheme" rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" media="not all">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js" defer></script>
@@ -209,12 +209,12 @@
 
     .repo-search input {
       width: 100%;
-      height: 2.2rem;
+      height: 2rem;
       border: 1px solid var(--border);
       border-radius: 999px;
       background: var(--surface-2);
       color: var(--text);
-      padding: 0.45rem 0.85rem 0.45rem 2.15rem;
+      padding: 0.45rem 0.15rem 0.45rem 2.15rem;
       font-size: 0.82rem;
       outline: none;
       transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
@@ -333,8 +333,8 @@
     }
 
     .brand-mark {
-      width: 1.95rem;
-      height: 1.95rem;
+      width: 1.5rem;
+      height: 1.5rem;
       flex: 0 0 auto;
       display: block;
     }
@@ -452,7 +452,7 @@
       font-size: 0.74rem;
       line-height: 1.2;
       cursor: pointer;
-      max-width: 13rem;
+      max-width: 10rem;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -477,6 +477,13 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow);
+    }
+
+    .branch-menu .notice {
+      padding: 0.3rem 0.42rem;
+      margin-bottom: 0;
+      font-size: 0.72rem;
+      line-height: 1.15;
     }
 
     .branch-option {
@@ -538,14 +545,6 @@
       gap: 0.5rem;
       padding: 0.7rem 0.8rem 0.55rem;
       border-bottom: 1px solid var(--border);
-    }
-
-    .sidebar-label {
-      font-size: 0.75rem;
-      font-weight: 760;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
     }
 
     .file-count {
@@ -849,6 +848,7 @@
       padding: 0 0.55rem;
       border-radius: 0.52rem;
       font-size: 0.76rem;
+      text-decoration: none;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1344,9 +1344,6 @@
     }
 
     @media (max-width: 720px) {
-      .branch-control {
-        order: 5;
-      }
       .toolbar {
         gap: 0.15rem;
       }
@@ -1493,11 +1490,6 @@
 
       <div class="topbar-spacer"></div>
 
-      <div id="branchControl" class="branch-control" hidden>
-        <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"></button>
-        <div id="branchMenu" class="branch-menu" role="listbox" aria-label="Branches" hidden></div>
-      </div>
-
       <div class="toolbar">
         <button id="rateBadge" class="rate-badge" type="button" title="GitHub API rate limit"></button>
         <button id="btnDark" class="toolbar-btn" type="button" title="Toggle dark mode" aria-label="Toggle dark mode" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use id="darkModeIcon" href="#i-moon"></use></svg></button>
@@ -1512,7 +1504,10 @@
     <main class="workspace">
       <aside id="sidebar" class="sidebar" aria-label="Repository files">
         <div class="sidebar-head">
-          <div class="sidebar-label">Files</div>
+          <div id="branchControl" class="branch-control" hidden>
+            <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"></button>
+            <div id="branchMenu" class="branch-menu" role="listbox" aria-label="Branches" hidden></div>
+          </div>
           <div id="fileCount" class="file-count">—</div>
           <button id="btnExpand" class="icon-btn" type="button" title="Expand all folders" aria-label="Expand all folders"><svg class="ui-icon" aria-hidden="true"><use id="expandIcon" href="#i-chevron"></use></svg></button>
         </div>
@@ -1539,7 +1534,7 @@
           <div id="contentBody" class="content-body">
             <div id="homeState" class="empty-state">
               <h1>Browse a GitHub repository</h1>
-              <p>LiteGH runs entirely in your browser. Open a repository from the search bar, or append <code>{user}/{repo}</code> to the URL, or browse the <a href="?/litegh/litegh.github.io">LiteGH Repository</a>.</p>
+              <p>LiteGH runs entirely in your browser. Open a repository from the search bar, or append <code>{user}/{repo}</code> to the URL, or browse the <a href="/litegh/litegh.github.io">LiteGH Repository</a>.</p>
             </div>
           </div>
           <footer class="app-footer">
@@ -2071,10 +2066,8 @@
     const updateFileCount = (items) => {
       const visible = items.filter(isVisibleTreeItem);
       const files = visible.filter((item) => item.type === 'blob').length;
-      $('fileCount').textContent = `${files} loaded file${files === 1 ? '' : 's'}`;
-      $('fileCount').title = state.treeFullyLoaded
-        ? 'Tree data loaded; closed folders are rendered only when opened'
-        : 'Some folders load from GitHub only when opened';
+      $('fileCount').textContent = `${files} file${files === 1 ? '' : 's'}`;
+      $('fileCount').title = state.treeFullyLoaded ? 'Tree fully loaded' : 'Tree partially loaded';
     };
 
     const loadDirectoryNode = async (node, externalSignal = null) => {
