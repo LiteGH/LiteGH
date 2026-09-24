@@ -6,9 +6,9 @@ A minimal, lightweight GitHub repository browser for older devices in a single H
 
 ## Usage
 
-Just **replace `github.com` with `litegh.github.io`** to browse any GitHub repo blazingly fast.
+Just replace **`github.com`** with **`litegh.github.io`** to browse any GitHub repo blazingly fast.
 
-I.e. replace https://github.com/litegh/litegh.github.io with https://litegh.github.io/litegh/litegh.github.io
+For instance, just replace [**github.com**/litegh/litegh.github.io](https://github.com/litegh/litegh.github.io) with [**litegh.github.io**/litegh/litegh.github.io](https://litegh.github.io/litegh/litegh.github.io) to browse this repo in LiteGH.
 
 ### Examples
 

@@ -11,12 +11,13 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <meta name="description" content="LiteGH — lightweight GitHub repository browser">
+  <meta name="description" content="LiteGH — lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <link id="hljsTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <link id="hljsLightTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <link id="hljsDarkTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="not all">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.1/dist/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
@@ -1518,15 +1519,14 @@
           <div id="contentBody" class="content-body">
             <div id="homeState" class="empty-state">
               <h1>Browse a GitHub repository</h1>
-              <p>LiteGH runs entirely in your browser. Open a repository from the search bar, use the URL parameters, or drop the file next to a local checkout.</p>
-              <p>Browse the <a href="?/litegh/litegh.github.io">LiteGH Repository</a></p>
+              <p>LiteGH runs entirely in your browser. Open a repository from the search bar, or append <code>{user}/{repo}</code> to the URL, or browse the <a href="?/litegh/litegh.github.io">LiteGH Repository</a>.</p>
             </div>
           </div>
           <footer class="app-footer">
             <span id="footerText">LiteGH · browser-only GitHub repository viewer</span>
             <span class="footer-links">
-              <a href="https://github.com/pushme-pullyou/tootoo" target="_blank" rel="noopener">Source</a>
-              <a id="licenseLink" href="#" target="_blank" rel="noopener" hidden>License</a>
+              <a href="https://github.com/litegh/litegh.github.io" target="_blank" rel="noopener noreferrer">Source</a>
+              <a id="licenseLink" href="#" target="_blank" rel="noopener noreferrer" hidden>License</a>
             </span>
           </footer>
         </div>
@@ -1561,6 +1561,8 @@
       tree: null,
       rootNode: null,
       treeVersion: 0,
+      treeIndex: new Map(),
+      treeFullyLoaded: false,
       currentFilePath: '',
       localMode: false,
       localRepo: { owner: '', repo: '', branch: '' },
@@ -1573,7 +1575,38 @@
     };
 
     const cache = new Map();
+    let memoryCacheBytes = 0;
+    const MEMORY_FILE_CACHE_MAX_BYTES = 5 * 1024 * 1024;
+    const MEMORY_FILE_CACHE_ITEM_MAX_BYTES = 1024 * 1024;
+    const SESSION_FILE_CACHE_MAX_BYTES = 1024 * 1024;
+    const SESSION_FILE_CACHE_ITEM_MAX_BYTES = 256 * 1024;
     const fileCacheStorageKey = () => storageKey('fileTextCache');
+    const getMemoryFileCache = (key) => {
+      const value = cache.get(key);
+      if (value == null) return null;
+      cache.delete(key);
+      cache.set(key, value);
+      return value;
+    };
+    const setMemoryFileCache = (key, text) => {
+      if (cache.has(key)) {
+        memoryCacheBytes -= cache.get(key).length;
+        cache.delete(key);
+      }
+      if (text.length > MEMORY_FILE_CACHE_ITEM_MAX_BYTES) return;
+      cache.set(key, text);
+      memoryCacheBytes += text.length;
+      while (memoryCacheBytes > MEMORY_FILE_CACHE_MAX_BYTES && cache.size) {
+        const oldestKey = cache.keys().next().value;
+        const oldestText = cache.get(oldestKey);
+        cache.delete(oldestKey);
+        memoryCacheBytes -= oldestText.length;
+      }
+    };
+    const clearFileMemoryCache = () => {
+      cache.clear();
+      memoryCacheBytes = 0;
+    };
     const readSessionFileCache = (key) => {
       const raw = safeGet(sessionStorage, fileCacheStorageKey());
       if (!raw) return null;
@@ -1585,13 +1618,18 @@
       }
     };
     const writeSessionFileCache = (key, text) => {
+      if (text.length > SESSION_FILE_CACHE_ITEM_MAX_BYTES) return;
       let parsed = {};
       try { parsed = JSON.parse(safeGet(sessionStorage, fileCacheStorageKey()) || '{}'); } catch (_) { parsed = {}; }
       parsed[key] = { text, used: Date.now() };
-      const keys = Object.keys(parsed);
-      if (keys.length > 50) {
-        keys.sort((a, b) => (parsed[a].used || 0) - (parsed[b].used || 0));
-        delete parsed[keys[0]];
+      const bytes = (value) => String(value?.text || '').length;
+      let total = Object.values(parsed).reduce((sum, value) => sum + bytes(value), 0);
+      const ordered = Object.entries(parsed).sort(([, a], [, b]) => (a.used || 0) - (b.used || 0));
+      while (total > SESSION_FILE_CACHE_MAX_BYTES && ordered.length) {
+        const [oldKey, oldValue] = ordered.shift();
+        if (oldKey === key && Object.keys(parsed).length === 1) break;
+        total -= bytes(oldValue);
+        delete parsed[oldKey];
       }
       safeSet(sessionStorage, fileCacheStorageKey(), JSON.stringify(parsed));
     };
@@ -1617,7 +1655,9 @@
     ];
     const NO_COPY_EXTS = [...IMAGE_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS, 'pdf', ...SHEET_EXTS];
     const README_RE = /^readme(?:\.(?:md|markdown|mkd|mdown|txt))?$/i;
-
+    const MAX_MARKDOWN_BYTES = 5 * 1024 * 1024;
+    const MAX_SPREADSHEET_BYTES = 10 * 1024 * 1024;
+    const MAX_HTML_PREVIEW_BYTES = 5 * 1024 * 1024;
     const $ = (id) => document.getElementById(id);
     const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1711,7 +1751,9 @@
     };
 
     const localUrlFor = (path) => {
-      if (!state.localMode || !state.localRepo.branch || state.branch !== state.localRepo.branch) return null;
+      if (!state.localMode || !state.localRepo.owner || !state.localRepo.repo || !state.localRepo.branch) return null;
+      if (state.owner.toLowerCase() !== state.localRepo.owner.toLowerCase() || state.repo.toLowerCase() !== state.localRepo.repo.toLowerCase()) return null;
+      if (state.branch !== state.localRepo.branch) return null;
       return `./${encodePath(path)}`;
     };
 
@@ -1736,16 +1778,16 @@
 
     const fetchFileText = async (path, signal) => {
       const key = `${state.owner}/${state.repo}/${state.branch}/${path}`;
-      if (cache.has(key)) return cache.get(key);
+      const memoryCached = getMemoryFileCache(key);
+      if (memoryCached !== null) return memoryCached;
       const stored = readSessionFileCache(key);
       if (stored !== null) {
-        cache.set(key, stored);
+        setMemoryFileCache(key, stored);
         return stored;
       }
       const response = await fetchFileResponse(path, signal);
       const text = await response.text();
-      cache.set(key, text);
-      if (cache.size > 50) cache.delete(cache.keys().next().value);
+      setMemoryFileCache(key, text);
       writeSessionFileCache(key, text);
       return text;
     };
@@ -1811,11 +1853,12 @@
     });
 
     const rememberTreeEntry = (item) => {
-      const existing = state.tree.find((entry) => entry.path === item.path);
+      const existing = state.treeIndex.get(item.path);
       if (existing) {
         Object.assign(existing, item);
       } else {
         state.tree.push(item);
+        state.treeIndex.set(item.path, item);
       }
     };
 
@@ -1824,18 +1867,24 @@
       return path.split('/').reduce((node, part) => node?.children?.[part], state.rootNode);
     };
 
-    const mergeDirectoryEntries = (node, items) => {
+    const mergeTreeEntries = (node, items) => {
       for (const rawItem of items) {
-        if (!rawItem?.path || !['file', 'dir'].includes(rawItem.type)) continue;
+        if (!rawItem?.path || !['blob', 'tree'].includes(rawItem.type)) continue;
         const item = normalizeTreeEntry(rawItem);
         if (!isVisibleTreeItem(item)) continue;
-        const name = item.path.split('/').pop();
+        const relativePath = node.path && item.path.startsWith(`${node.path}/`)
+          ? item.path.slice(node.path.length + 1)
+          : item.path;
+        const fullPath = node.path ? `${node.path}/${relativePath}` : relativePath;
+        item.path = fullPath;
+        const name = relativePath.split('/').filter(Boolean).pop();
+        if (!name) continue;
         if (item.type === 'tree') {
           const child = node.children[name] || {
             type: 'tree',
             path: item.path,
             children: Object.create(null),
-            loaded: false,
+            loaded: true,
             loading: false,
             request: null,
             source: item,
@@ -1843,19 +1892,21 @@
           child.path = item.path;
           child.source = item;
           node.children[name] = child;
-          rememberTreeEntry(item);
         } else {
           node.children[name] = item;
-          rememberTreeEntry(item);
         }
+        rememberTreeEntry(item);
       }
       node.loaded = true;
     };
 
-    const mergeRecursiveTree = (items) => {
+    const mergeRecursiveTree = (items, treeSha = '') => {
       state.rootNode = makeRootNode();
       state.rootNode.loaded = true;
+      state.rootNode.source = { sha: treeSha };
       state.tree = [];
+      state.treeIndex = new Map();
+      state.treeFullyLoaded = true;
       for (const rawItem of items) {
         if (!rawItem?.path || !['blob', 'tree'].includes(rawItem.type)) continue;
         const item = normalizeTreeEntry(rawItem);
@@ -1879,7 +1930,7 @@
         }
         const name = parts[parts.length - 1];
         if (item.type === 'tree') {
-          node.children[name] = node.children[name] || {
+          const child = node.children[name] || {
             type: 'tree',
             path: item.path,
             children: Object.create(null),
@@ -1888,18 +1939,18 @@
             request: null,
             source: item,
           };
-          node.children[name].path = item.path;
-          node.children[name].source = item;
-          node.children[name].loaded = true;
+          child.path = item.path;
+          child.source = item;
+          node.children[name] = child;
         } else {
           node.children[name] = item;
         }
-        state.tree.push(item);
+        rememberTreeEntry(item);
       }
     };
 
-    const treeApiUrl = () =>
-      `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/git/trees/${encodeURIComponent(state.branch)}?recursive=1`;
+    const treeApiUrl = (treeSha = state.branch, recursive = false) =>
+      `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/git/trees/${encodeURIComponent(treeSha)}${recursive ? '?recursive=1' : ''}`;
 
     const renderTree = () => {
       const root = state.rootNode;
@@ -1924,9 +1975,7 @@
     const renderTreeNode = (name, node, parentPath, depth) => {
       const fullPath = parentPath ? `${parentPath}/${name}` : name;
       if (node.type === 'tree') {
-        const children = node.loaded
-          ? renderFolderChildren(node, fullPath, depth + 1)
-          : '<div class="folder-placeholder">Open folder to load files…</div>';
+        const children = `<div class="folder-placeholder">${state.treeFullyLoaded && node.loaded ? 'Open folder to show files…' : 'Open folder to load files…'}</div>`;
         const hasReadme = node.loaded && Object.keys(node.children).some((childName) => node.children[childName].type === 'blob' && README_RE.test(childName));
         const summaryClass = `tree-folder tree-indent-${Math.min(depth, 4)}`;
         return `<details class="folder-wrap" data-folder-path="${escapeHTML(fullPath)}" ${hasReadme ? 'data-readme="1"' : ''}>
@@ -1951,12 +2000,25 @@
       const visible = items.filter(isVisibleTreeItem);
       const files = visible.filter((item) => item.type === 'blob').length;
       $('fileCount').textContent = `${files} loaded file${files === 1 ? '' : 's'}`;
-      $('fileCount').title = 'Only folders opened in the tree are loaded';
+      $('fileCount').title = state.treeFullyLoaded
+        ? 'Tree data loaded; closed folders are rendered only when opened'
+        : 'Some folders load from GitHub only when opened';
     };
 
     const loadDirectoryNode = async (node, externalSignal = null) => {
       if (!node || node.type !== 'tree') return true;
-      if (node.loaded) return true;
+      if (node.loaded) {
+        const details = document.querySelector(`details[data-folder-path="${CSS.escape(node.path)}"]`);
+        if (details?.open) {
+          const holder = details.querySelector(':scope > .folder-children');
+          if (holder) holder.innerHTML = renderFolderChildren(node, node.path, node.path ? node.path.split('/').length : 0);
+          treeRows = Array.from(document.querySelectorAll('.tree-item'));
+          bindFolderAutoOpen();
+          updateFileCount(state.tree || []);
+          runFilter();
+        }
+        return true;
+      }
       if (node.loading && node.request) {
         await node.request.promise;
         return node.loaded;
@@ -1980,10 +2042,13 @@
 
       const promise = (async () => {
         try {
-          const data = await ghApi(contentsApiUrl(node.path), controller.signal);
+          const treeSha = node.source?.sha;
+          if (!treeSha) throw new Error(`GitHub did not provide a tree identifier for ${node.path || 'repository root'}.`);
+          const data = await ghApi(treeApiUrl(treeSha, false), controller.signal);
           if (version !== state.treeVersion) return false;
-          if (!Array.isArray(data)) throw new Error(`GitHub returned an unexpected response for ${node.path || 'repository root'}.`);
-          mergeDirectoryEntries(node, data);
+          if (!data || !Array.isArray(data.tree)) throw new Error(`GitHub returned an unexpected tree response for ${node.path || 'repository root'}.`);
+          if (data.truncated) throw new Error(`GitHub returned too many entries for ${node.path || 'repository root'}.`);
+          mergeTreeEntries(node, data.tree);
           return true;
         } catch (error) {
           if (controller.signal.aborted || version !== state.treeVersion) return false;
@@ -2043,6 +2108,9 @@
     const runFilter = () => {
       const query = $('treeFilter').value.trim().toLowerCase();
       $('btnFilterClear').style.display = query ? 'block' : 'none';
+      $('treeFilter').title = !state.treeFullyLoaded && query
+        ? 'This repository has a large tree; search includes files loaded from opened folders.'
+        : 'Filter loaded files and folders';
       const folders = Array.from(document.querySelectorAll('.folder-wrap'));
       const files = Array.from(document.querySelectorAll('.tree-item'));
       if (!query) {
@@ -2112,32 +2180,55 @@
       return route;
     };
 
-    const parseAppRoute = () => {
-      const raw = location.search.replace(/^\?/, '').replace(/^\//, '').replace(/\/$/, '');
+    const parseRouteString = (value) => {
+      const raw = value.replace(/^\?/, '').replace(/^\//, '').replace(/\/$/, '');
       if (!raw) return null;
       const match = raw.match(/^([^/]+)\/([^/]+)(?:\/(tree|blob)\/(.*))?$/);
       if (!match) return null;
       const owner = safeDecode(match[1]);
       const repo = safeDecode(match[2]);
       const mode = match[3] || '';
-      const tail = match[4] ? safeDecode(match[4]) : '';
+      const tailRaw = match[4] || '';
       if (!owner || !repo) return null;
-      if (mode === 'tree') return { owner, repo, branch: tail, file: '' };
+      if (mode === 'tree') return { owner, repo, branch: safeDecode(tailRaw), file: '' };
       if (mode === 'blob') {
-        const slash = tail.indexOf('/');
-        if (slash < 0) return { owner, repo, branch: tail, file: '' };
-        return { owner, repo, branch: tail.slice(0, slash), file: tail.slice(slash + 1) };
+        const slash = tailRaw.indexOf('/');
+        if (slash < 0) return { owner, repo, branch: safeDecode(tailRaw), file: '' };
+        return { owner, repo, branch: safeDecode(tailRaw.slice(0, slash)), file: safeDecode(tailRaw.slice(slash + 1)) };
       }
       return { owner, repo, branch: '', file: '' };
     };
 
+    const parseAppRoute = () => parseRouteString(location.search);
+
+    const buildPublicRoute = (owner, repo, branch = '', file = '') =>
+      location.protocol === 'file:'
+        ? buildAppRoute(owner, repo, branch, file)
+        : buildCleanPathRoute(owner, repo, branch, file);
+
     const navigateToAppRoute = (owner, repo, branch = '', file = '', replace = false, anchor = '') => {
-      const route = buildAppRoute(owner, repo, branch, file);
+      const route = buildPublicRoute(owner, repo, branch, file);
       const hash = anchor ? `#${encodeHash(anchor)}` : '';
-      const url = `${location.pathname}${route}${hash}`;
+      const url = route.startsWith('?') ? `${location.pathname}${route}${hash}` : `${route}${hash}`;
       if (replace) history.replaceState(null, '', url);
       else history.pushState({}, '', url);
       hashNavigated = Boolean(hash);
+    };
+
+    const buildCleanPathRoute = (owner, repo, branch = '', file = '') => {
+      let route = `/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+      if (branch) {
+        route += file
+          ? `/blob/${encodeURIComponent(branch)}/${encodePath(file)}`
+          : `/tree/${encodeURIComponent(branch)}`;
+      }
+      return route;
+    };
+
+    const canonicalizeQueryRoute = (route) => {
+      if (!route || !location.search) return;
+      const cleanUrl = `${buildCleanPathRoute(route.owner, route.repo, route.branch, route.file)}${location.hash || ''}`;
+      window.history.replaceState(null, '', cleanUrl);
     };
 
     const parseHash = () => ({
@@ -2175,11 +2266,25 @@
     };
 
     const renderMarkdown = async (text, path, signal, anchor = '') => {
+      if (text.length > MAX_MARKDOWN_BYTES) {
+        const notice = document.createElement('div');
+        notice.className = 'notice warning';
+        notice.textContent = `Markdown preview is limited to ${formatFileSize(MAX_MARKDOWN_BYTES)}. Use Raw to view the complete file.`;
+        const wrap = document.createElement('div');
+        wrap.className = 'source-block';
+        const code = document.createElement('code');
+        code.textContent = text;
+        const pre = document.createElement('pre');
+        pre.appendChild(code);
+        wrap.appendChild(pre);
+        $('contentBody').replaceChildren(notice, wrap);
+        return;
+      }
       const currentDir = path.includes('/') ? path.split('/').slice(0, -1).join('/') : '';
       const html = marked.parse(text, { breaks: false, gfm: true });
       const wrapper = document.createElement('div');
       wrapper.className = 'markdown-body';
-      wrapper.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
+      wrapper.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] });
 
       const used = new Set();
       wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
@@ -2195,7 +2300,7 @@
         const href = link.getAttribute('href') || '';
         if (/^(https?:)?\/\//i.test(href) || /^[a-z][a-z0-9+.-]*:/i.test(href)) {
           link.target = '_blank';
-          link.rel = 'noopener';
+          link.rel = 'noopener noreferrer';
           return;
         }
         const fragmentIndex = href.indexOf('#');
@@ -2204,7 +2309,7 @@
         const repoPath = clean.startsWith('?') || clean === '' ? path : resolveRepoPath(clean, currentDir);
         link.href = repoPath === path && fragment
           ? `#${encodeHash(fragment)}`
-          : `${buildAppRoute(state.owner, state.repo, state.branch, repoPath)}${fragment ? `#${encodeHash(fragment)}` : ''}`;
+          : `${buildPublicRoute(state.owner, state.repo, state.branch, repoPath)}${fragment ? `#${encodeHash(fragment)}` : ''}`;
         link.addEventListener('click', (event) => {
           if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
@@ -2214,11 +2319,15 @@
 
       const imageJobs = Array.from(wrapper.querySelectorAll('img[src]')).map(async (img) => {
         const src = img.getAttribute('src') || '';
-        if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) return;
+        if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) {
+          if (/^https:\/\//i.test(src)) img.referrerPolicy = 'no-referrer';
+          return;
+        }
         const clean = src.split(/[?#]/, 1)[0];
         if (!clean) return;
         try {
           img.loading = 'lazy';
+          img.referrerPolicy = 'no-referrer';
           img.src = await resolveMediaUrl(resolveRepoPath(clean, currentDir), signal);
         } catch (_) { /* keep broken image */ }
       });
@@ -2248,10 +2357,24 @@
     };
 
     const renderHtml = (text, ext) => {
+      if (text.length > MAX_HTML_PREVIEW_BYTES) {
+        const notice = document.createElement('div');
+        notice.className = 'notice warning';
+        notice.textContent = `HTML preview is limited to ${formatFileSize(MAX_HTML_PREVIEW_BYTES)}. Use Raw or New Tab to open the complete file.`;
+        const wrap = document.createElement('div');
+        wrap.className = 'source-block';
+        const code = document.createElement('code');
+        code.textContent = text;
+        const pre = document.createElement('pre');
+        pre.appendChild(code);
+        wrap.appendChild(pre);
+        $('contentBody').replaceChildren(notice, wrap);
+        return;
+      }
       const url = makeBlobUrl(new Blob([text], { type: 'text/html' }));
       const note = document.createElement('div');
       note.className = 'notice';
-      note.innerHTML = 'Preview is sandboxed: scripts do not run in the embedded view. Use the raw toggle or New Tab for the source/file.';
+      note.textContent = 'Preview is sandboxed: scripts do not run in the embedded view. Use the raw toggle or New Tab for the source/file.';
       const iframe = document.createElement('iframe');
       iframe.className = 'html-frame';
       iframe.setAttribute('sandbox', '');
@@ -2265,6 +2388,7 @@
       frame.className = 'media-frame';
       const img = document.createElement('img');
       img.className = 'media-content';
+      img.referrerPolicy = 'no-referrer';
       img.src = url;
       img.alt = name;
       frame.appendChild(img);
@@ -2276,6 +2400,7 @@
       frame.className = 'media-frame';
       const img = document.createElement('img');
       img.className = 'media-content';
+      img.referrerPolicy = 'no-referrer';
       img.src = url;
       img.alt = name;
       frame.appendChild(img);
@@ -2313,6 +2438,13 @@
 
     const renderSpreadsheet = (data, signal) => {
       if (signal.aborted) return;
+      if (data.byteLength > MAX_SPREADSHEET_BYTES) {
+        const notice = document.createElement('div');
+        notice.className = 'notice warning';
+        notice.textContent = `Spreadsheet preview is limited to ${formatFileSize(MAX_SPREADSHEET_BYTES)}.`;
+        $('contentBody').replaceChildren(notice);
+        return;
+      }
       try {
         let workbook;
         const ext = extOf(state.currentFilePath);
@@ -2328,7 +2460,7 @@
           section.className = 'sheet';
           section.innerHTML = `<h3>${escapeHTML(sheetName)}</h3>`;
           const raw = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
-          const clean = DOMPurify.sanitize(raw);
+          const clean = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
           const holder = document.createElement('div');
           holder.innerHTML = clean;
           section.appendChild(holder.firstElementChild || holder);
@@ -2361,7 +2493,7 @@
 
       const actions = [];
       const githubUrl = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/blob/${encodeURIComponent(state.branch)}/${encodePath(path)}`;
-      actions.push(`<a class="file-action" href="${escapeHTML(githubUrl)}" target="_blank" rel="noopener" data-action="github"><svg class="ui-icon" aria-hidden="true"><use href="#i-github"></use></svg><span>GitHub</span></a>`);
+      actions.push(`<a class="file-action" href="${escapeHTML(githubUrl)}" target="_blank" rel="noopener noreferrer" data-action="github"><svg class="ui-icon" aria-hidden="true"><use href="#i-github"></use></svg><span>GitHub</span></a>`);
       const hasToggle = MARKDOWN_EXTS.includes(ext) || ext === 'html' || ext === 'htm' || ext === 'svg';
       const showRaw = getViewPreference(ext) === 'raw';
       if (hasToggle) actions.push(`<button class="file-action" data-action="toggle-view" aria-pressed="${showRaw}"><svg class="ui-icon" aria-hidden="true"><use href="#i-raw"></use></svg><span>${showRaw ? 'Rendered' : 'Raw'}</span></button>`);
@@ -2395,9 +2527,9 @@
       renderCode(text, extOf(state.currentFilePath));
     };
 
-    const selectFile = async (path, anchor = '') => {
+    const selectFile = async (path, anchor = '', historyMode = 'push') => {
       if (path === state.currentFilePath && anchor) {
-        navigateToAppRoute(state.owner, state.repo, state.branch, path, false, anchor);
+        if (historyMode !== 'none') navigateToAppRoute(state.owner, state.repo, state.branch, path, historyMode === 'replace', anchor);
         scrollToAnchor(anchor);
         return;
       } 
@@ -2460,7 +2592,7 @@
         }
 
         if (signal.aborted) return;
-        navigateToAppRoute(state.owner, state.repo, state.branch, path, false, anchor);
+        if (historyMode !== 'none') navigateToAppRoute(state.owner, state.repo, state.branch, path, historyMode === 'replace', anchor);
         safeSet(sessionStorage, storageKey(`currentFile:${state.owner}/${state.repo}/${state.branch}`), path);
       } catch (error) {
         if (signal.aborted || error.name === 'AbortError') return;
@@ -2478,7 +2610,7 @@
       return true;
     };
 
-    const renderHomeState = () => {
+    const renderHomeState = (message = '') => {
       abortTreeRequest();
       abortContentRequest();
       state.owner = '';
@@ -2486,6 +2618,8 @@
       state.branch = '';
       state.currentFilePath = '';
       state.tree = null;
+      state.treeIndex = new Map();
+      state.treeFullyLoaded = false;
       state.rootNode = null;
       state.activePanel = null;
       updateRepoHeader();
@@ -2494,7 +2628,16 @@
       $('fileCount').textContent = '—';
       setContentHeader('', '', 'Browse a GitHub repository');
       const homeState = $('homeState');
-      if (homeState) $('contentBody').replaceChildren(homeState);
+      const fragment = document.createDocumentFragment();
+      if (message) {
+        const notice = document.createElement('div');
+        notice.className = 'notice error';
+        notice.setAttribute('role', 'alert');
+        notice.textContent = message;
+        fragment.appendChild(notice);
+      }
+      if (homeState) fragment.appendChild(homeState);
+      $('contentBody').replaceChildren(fragment);
       updateFooter();
       safeRemove(localStorage, storageKey('repo'));
       history.replaceState(null, '', `${location.pathname}`);
@@ -2548,13 +2691,25 @@
     };
 
     const detectRepo = async () => {
-      const route = parseAppRoute();
-      if (route) {
-        CONFIG.owner = route.owner;
-        CONFIG.repo = route.repo;
-        CONFIG.branch = route.branch;
-        state.currentFilePath = route.file || '';
-        return route;
+      const hasSearchRoute = Boolean(location.search.replace(/^\?/, ''));
+      const queryRoute = parseAppRoute();
+      if (queryRoute) {
+        CONFIG.owner = queryRoute.owner;
+        CONFIG.repo = queryRoute.repo;
+        CONFIG.branch = queryRoute.branch;
+        state.currentFilePath = queryRoute.file || '';
+        queryRoute.fromQuery = true;
+        return queryRoute;
+      }
+      if (hasSearchRoute) return { invalid: true };
+
+      const pathRoute = parseRouteString(location.pathname);
+      if (pathRoute) {
+        CONFIG.owner = pathRoute.owner;
+        CONFIG.repo = pathRoute.repo;
+        CONFIG.branch = pathRoute.branch;
+        state.currentFilePath = pathRoute.file || '';
+        return pathRoute;
       }
 
       return { owner: CONFIG.owner, repo: CONFIG.repo, branch: CONFIG.branch, file: '' };
@@ -2573,6 +2728,8 @@
       state.treeVersion += 1;
       state.rootNode = makeRootNode();
       state.tree = [];
+      state.treeIndex = new Map();
+      state.treeFullyLoaded = false;
 
       const controller = new AbortController();
       requests.tree = controller;
@@ -2580,7 +2737,7 @@
         setContentHeader('', '', 'Repository');
         $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
         await getRepoInfo(controller.signal);
-        const treeData = await ghApi(treeApiUrl(), controller.signal);
+        const treeData = await ghApi(treeApiUrl(state.branch, true), controller.signal);
         if (controller.signal.aborted) return;
         if (!treeData || !Array.isArray(treeData.tree)) {
           throw new Error('GitHub returned an unexpected tree response.');
@@ -2588,16 +2745,20 @@
 
         if (treeData.truncated) {
           // GitHub caps recursive tree responses at 100,000 entries or 7 MB.
-          // Fall back to per-directory loading only for repositories above that limit.
+          // Use the root tree SHA and load each subtree non-recursively as needed.
           state.rootNode = makeRootNode();
+          state.rootNode.source = { sha: treeData.sha || '' };
+          state.rootNode.loaded = false;
           state.tree = [];
+          state.treeIndex = new Map();
+          state.treeFullyLoaded = false;
           await loadDirectoryNode(state.rootNode, controller.signal);
           if (!state.rootNode.loaded) {
             throw state.rootNode.loadError || new Error('Unable to load the repository root.');
           }
-          $('contentBody').innerHTML = '<div class="notice">This repository exceeds GitHub’s recursive tree response limit, so LiteGH loads folders as they are opened.</div>';
+          $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
         } else {
-          mergeRecursiveTree(treeData.tree);
+          mergeRecursiveTree(treeData.tree, treeData.sha || '');
         }
 
         renderTree();
@@ -2608,13 +2769,16 @@
       } catch (error) {
         if (controller.signal.aborted) return;
         if (error.status === 404) {
-          renderHomeState();
+          renderHomeState('Repository or branch not found.');
           return;
         }
         const suffix = error.status === 403 || error.status === 429 ? '<br><br><button class="secondary-btn" data-action="open-token">Open token settings</button>' : '';
         const localNote = state.fileAccessBlocked ? '<br><br><strong>Local file access:</strong> your browser blocked the .git/config read. The local-file workflow needs file access enabled for this browser.' : '';
-        $('tree').innerHTML = `<div class="notice error">${escapeHTML(error.message)}${suffix}${localNote}</div>`;
-        $('contentBody').innerHTML = `<div class="empty-state"><h1>Unable to load repository</h1><p>${escapeHTML(error.message)}</p>${suffix ? '<p>Public GitHub repositories can be opened without a token; private repositories and higher limits use the token settings.</p>' : ''}</div>`;
+        const treeNotice = document.createElement('div');
+        treeNotice.className = 'notice error';
+        treeNotice.textContent = error.message;
+        $('tree').replaceChildren(treeNotice);
+        showError(error.message, Boolean(suffix));
       } finally {
         if (requests.tree === controller) requests.tree = null;
       }
@@ -2686,7 +2850,7 @@
       state.treeVersion += 1;
       state.currentFilePath = '';
       branchList = null;
-      cache.clear();
+      clearFileMemoryCache();
       clearBlobUrls();
       navigateToAppRoute(state.owner, state.repo, state.branch, '', true);
       hashNavigated = false;
@@ -2695,7 +2859,7 @@
       autoSelectReadme();
     };
 
-    const autoSelectReadme = async () => {
+    const autoSelectReadme = async (silent = false) => {
       if (!state.rootNode) return;
       const { anchor } = parseHash();
       const key = storageKey(`currentFile:${state.owner}/${state.repo}/${state.branch}`);
@@ -2703,13 +2867,13 @@
       if (saved) {
         const item = await ensureRepoPath(saved);
         if (item) {
-          selectFile(saved);
+          selectFile(saved, '', silent ? 'none' : 'push');
           return;
         }
       }
       const readme = Object.entries(state.rootNode.children).find(([name, item]) => item.type === 'blob' && README_RE.test(name));
       if (readme) {
-        selectFile(readme[1].path, anchor);
+        selectFile(readme[1].path, anchor, silent ? 'none' : 'push');
         return;
       }
       renderHomeState();
@@ -2749,7 +2913,7 @@
       $('contentBody').innerHTML = `
         <div class="info-card">
           <h2>LiteGH</h2>
-          <p>A lightweight GitHub repository browser implemented as a single HTML file.</p>
+          <p>A minimal, lightweight GitHub repository browser for older devices in a single HTML file.</p>
           <h3>Repository</h3>
           <ul>
             <li><strong>Repo:</strong> ${escapeHTML(state.owner && state.repo ? `${state.owner}/${state.repo}` : 'not loaded')}</li>
@@ -2782,11 +2946,10 @@
           <ul>
             <li>A− / A+ adjusts the root font size in 2px steps while the app itself uses rem units.</li>
             <li>Rendered ↔ Raw preferences are saved per file type.</li>
-            <li>File text is cached in memory and sessionStorage for the current browser session. LiteGH uses one recursive tree request whenever GitHub can return the whole tree; only repositories above GitHub’s recursive response limit fall back to loading folders on demand.</li>
+            <li>Small files are cached in memory and a bounded sessionStorage cache for the current browser session. LiteGH uses one recursive tree request whenever GitHub can return the whole tree; only repositories above GitHub’s recursive response limit load folder subtrees on demand.</li>
           </ul>
           <hr>
           <button class="secondary-btn" data-action="self-test">🧪 Run self-test</button>
-          <button class="secondary-btn" data-action="choose-repo">Choose another repository</button>
         </div>`;
       try {
         const response = await fetch('https://api.github.com/rate_limit', { headers: ghHeaders() });
@@ -2950,10 +3113,10 @@
       document.body.classList.toggle('dark-mode', enabled);
       $('darkModeIcon').setAttribute('href', enabled ? '#i-sun' : '#i-moon');
       $('btnDark').setAttribute('aria-pressed', String(enabled));
-      const theme = $('hljsTheme');
-      theme.href = enabled
-        ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'
-        : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+      const lightTheme = $('hljsLightTheme');
+      const darkTheme = $('hljsDarkTheme');
+      lightTheme.media = enabled ? 'not all' : 'all';
+      darkTheme.media = enabled ? 'all' : 'not all';
       safeSet(localStorage, storageKey('darkMode'), String(enabled));
     };
 
@@ -2976,9 +3139,10 @@
         panel.innerHTML = items.map((item, index) => {
           const description = item.description || 'No description';
           const language = item.language || '—';
+          const avatarUrl = /^https:\/\//i.test(item.owner?.avatar_url || '') ? item.owner.avatar_url : '';
           return `<button class="repo-search-result" type="button" role="option" data-result-index="${index}">
             <span class="repo-search-result-top">
-              <img class="repo-avatar" src="${escapeHTML(item.owner?.avatar_url || '')}" alt="" loading="lazy" referrerpolicy="no-referrer">
+              ${avatarUrl ? `<img class="repo-avatar" src="${escapeHTML(avatarUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="repo-avatar placeholder" aria-hidden="true"></span>'}
               <span class="repo-search-name">${escapeHTML(item.full_name || `${item.owner?.login || ''}/${item.name || ''}`)}</span>
             </span>
             <span class="repo-search-meta"><span>★ ${Number(item.stargazers_count || 0).toLocaleString()}</span><span>${escapeHTML(language)}</span><span>Updated ${escapeHTML(formatRelativeDate(item.updated_at))}</span></span>
@@ -3063,9 +3227,12 @@
       CONFIG.owner = parsed.owner;
       CONFIG.repo = parsed.repo;
       CONFIG.branch = '';
+      branchList = null;
       state.currentFilePath = '';
       state.tree = null;
       state.rootNode = null;
+      state.treeFullyLoaded = false;
+      clearFileMemoryCache();
       navigateToAppRoute(parsed.owner, parsed.repo);
       input.value = `${parsed.owner}/${parsed.repo}`;
       bootRepo();
@@ -3125,9 +3292,12 @@
       });
       $('brandButton').addEventListener('click', () => {
         CONFIG.branch = '';
+        branchList = null;
         state.currentFilePath = '';
         state.tree = null;
         state.rootNode = null;
+        state.treeFullyLoaded = false;
+        clearFileMemoryCache();
         navigateToAppRoute(CONFIG.owner, CONFIG.repo);
         bootRepo();
       });
@@ -3249,11 +3419,11 @@
         event.target.textContent = input.type === 'password' ? 'Show' : 'Hide';
       } else if (action === 'save-token') {
         safeSet(localStorage, storageKey('githubToken'), $('tokenInput').value.trim());
-        cache.clear();
+        clearFileMemoryCache();
         location.reload();
       } else if (action === 'clear-token') {
         safeRemove(localStorage, storageKey('githubToken'));
-        cache.clear();
+        clearFileMemoryCache();
         location.reload();
       } else if (action === 'reset-all') {
         resetAllData();
@@ -3388,18 +3558,33 @@
     const bootRepo = async () => {
       await detectLocalMode();
       const route = await detectRepo();
-      if (!CONFIG.owner || !CONFIG.repo) return;
+      if (route?.invalid) {
+        renderHomeState('Invalid repository URL. Enter owner/repo in the top search bar, or use a GitHub-style repository URL.');
+        return;
+      }
+      if (!CONFIG.owner || !CONFIG.repo) {
+        renderHomeState();
+        return;
+      }
+      const previousRepo = `${state.owner}/${state.repo}`;
+      const nextRepo = `${CONFIG.owner}/${CONFIG.repo}`;
+      if (previousRepo !== nextRepo) {
+        branchList = null;
+        clearFileMemoryCache();
+        clearBlobUrls();
+      }
       state.owner = CONFIG.owner;
       state.repo = CONFIG.repo;
       state.branch = CONFIG.branch;
       state.currentFilePath = route?.file || state.currentFilePath || '';
-      if (!route) navigateToAppRoute(state.owner, state.repo, state.branch, state.currentFilePath, true);
+      if (route?.fromQuery) canonicalizeQueryRoute(route);
+      else if (!route?.owner && location.pathname === '/') navigateToAppRoute(state.owner, state.repo, state.branch, state.currentFilePath, true);
       updateRepoHeader();
       await fetchTree();
       if (route?.file) {
         const { anchor } = parseHash();
-        selectFile(route.file, anchor);
-      } else autoSelectReadme();
+        selectFile(route.file, anchor, 'replace');
+      } else autoSelectReadme(Boolean(route?.fromQuery));
     };
 
     const init = async () => {
