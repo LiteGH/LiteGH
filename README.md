@@ -1,4 +1,4 @@
-![LiteGH](icons/logo-horizontal.png)
+<p align="center"><img src="icons/logo-horizontal.png" alt="LiteGH" width="490" height="160"></p>
 
 # [LiteGH](https://litegh.github.io)
 
