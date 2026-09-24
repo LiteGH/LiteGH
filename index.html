@@ -11,14 +11,14 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <meta name="description" content="LiteGH — lightweight GitHub repository browser for older devices.">
+  <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <link id="hljsLightTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <link id="hljsDarkTheme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="not all">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js" defer></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -227,21 +227,6 @@
       border-color: var(--error-border);
     }
 
-    .repo-search .search-hint {
-      position: absolute;
-      right: 0.45rem;
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 0.12rem 0.38rem;
-      border: 1px solid var(--border);
-      border-radius: 0.35rem;
-      color: var(--muted);
-      background: var(--surface);
-      font-size: 0.66rem;
-      line-height: 1.15;
-      pointer-events: none;
-    }
-
     .repo-search-results {
       position: absolute;
       top: calc(100% + 0.45rem);
@@ -338,7 +323,6 @@
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
-      min-width: 0;
     }
 
     .brand-mark {
@@ -457,10 +441,11 @@
       background: var(--surface-2);
       color: var(--text);
       border-radius: 999px;
-      padding: 0.32rem 0.62rem;
-      font-size: 0.78rem;
+      padding: 0.26rem 0.52rem;
+      font-size: 0.74rem;
+      line-height: 1.2;
       cursor: pointer;
-      max-width: 15rem;
+      max-width: 13rem;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -474,13 +459,13 @@
 
     .branch-menu {
       position: absolute;
-      top: calc(100% + 0.42rem);
+      top: calc(100% + 0.3rem);
       left: 0;
       z-index: 30;
-      width: min(18rem, 70vw);
-      max-height: 20rem;
+      width: min(16rem, 78vw);
+      max-height: 16rem;
       overflow: auto;
-      padding: 0.35rem;
+      padding: 0.2rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
@@ -491,8 +476,8 @@
       display: block;
       width: 100%;
       border: 0;
-      border-radius: 0.45rem;
-      padding: 0.45rem 0.55rem;
+      border-radius: 0.34rem;
+      padding: 0.3rem 0.42rem;
       text-align: left;
       background: transparent;
       color: var(--text);
@@ -500,12 +485,22 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-size: 0.72rem;
+      line-height: 1.15;
     }
 
     .branch-option:hover,
     .branch-option.is-current {
       background: var(--accent-soft);
       color: var(--accent);
+    }
+
+    #btnExpand .ui-icon {
+      transition: transform var(--transition);
+    }
+
+    #btnExpand.is-expanded .ui-icon {
+      transform: rotate(180deg);
     }
 
     .workspace {
@@ -1309,9 +1304,26 @@
     }
 
     @media (max-width: 900px) {
-      .repo-title {
+      .repo-search {
+        flex: 0 1 2.45rem;
+        width: 2.45rem;
+        min-width: 2.45rem;
         max-width: 42vw;
+        margin-left: 0.05rem;
+        transition: width var(--transition), flex-basis var(--transition);
       }
+
+      .repo-search:hover,
+      .repo-search:focus-within {
+        flex-basis: min(24rem, 42vw);
+        width: min(24rem, 42vw);
+      }
+
+      .repo-title {
+        display: inline;
+        max-width: min(30vw, 12rem);
+      }
+
       .content-inner {
         padding-inline: 0.9rem;
       }
@@ -1331,12 +1343,9 @@
       .toolbar-btn {
         min-width: 1.9rem;
       }
-      .repo-title {
-        display: none;
-      }
       .sidebar {
-        width: min(84vw, 20rem);
-        flex-basis: min(84vw, 20rem);
+        width: min(66vw, 15rem);
+        flex-basis: min(66vw, 15rem);
       }
       .resizer {
         width: 0;
@@ -1353,17 +1362,47 @@
         width: 100%;
         overflow: auto;
       }
+      .file-action {
+        min-width: 2rem;
+        width: 2rem;
+        padding-inline: 0;
+        flex: 0 0 2rem;
+      }
+      .file-action span {
+        display: none;
+      }
     }
 
     @media (max-width: 480px) {
       .topbar {
         padding-inline: 0.55rem;
       }
+      .repo-search,
+      .repo-search:hover,
+      .repo-search:focus-within {
+        flex-basis: 2.3rem;
+        width: 2.3rem;
+        min-width: 2.3rem;
+        max-width: 42vw;
+      }
+      .repo-search:hover,
+      .repo-search:focus-within {
+        flex-basis: 42vw;
+        width: 42vw;
+      }
       .brand-copy {
-        gap: 0.3rem;
+        gap: 0.28rem;
       }
       .brand-name {
-        font-size: 1rem;
+        font-size: 0.95rem;
+      }
+      .repo-title {
+        max-width: 18vw;
+        font-size: 0.72rem;
+      }
+      .sidebar {
+        width: min(58vw, 14rem);
+        flex-basis: min(58vw, 14rem);
       }
       .icon-btn,
       .toolbar-btn {
@@ -1411,36 +1450,6 @@
       }
     }
 
-    @media (max-width: 60rem) {
-      .repo-search {
-        flex: 1 1 20rem;
-        min-width: 10rem;
-      }
-      .repo-title {
-        display: none;
-      }
-    }
-
-    @media (max-width: 46rem) {
-      .topbar {
-        gap: 0.3rem;
-      }
-      .brand-copy {
-        display: none;
-      }
-      .repo-search {
-        min-width: 8rem;
-        margin-left: 0.05rem;
-      }
-      .repo-search .search-hint {
-        display: none;
-      }
-      .toolbar .toolbar-btn {
-        min-width: 1.85rem;
-        padding: 0 0.38rem;
-      }
-    }
-
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
@@ -1467,7 +1476,6 @@
         <svg class="ui-icon" aria-hidden="true"><use href="#i-search"></use></svg>
         <label class="sr-only" for="repoSearchInput">Open GitHub repository</label>
         <input id="repoSearchInput" name="repo" type="search" placeholder="Search GitHub repositories · Enter to search" spellcheck="false" autocapitalize="off" autocomplete="off" aria-controls="repoSearchResults" aria-expanded="false">
-        <span class="search-hint">Enter</span>
         <div id="repoSearchResults" class="repo-search-results" role="listbox" hidden></div>
       </form>
 
@@ -1543,8 +1551,8 @@
       owner: '',
       repo: '',
       branch: '',
-      appName: 'LiteGH',
-      subtitle: 'Lightweight GitHub repository browser',
+      appName: '',
+      subtitle: '',
       storagePrefix: 'litegh',
       sourceRepoUrl: 'https://github.com/litegh/litegh.github.io',
       autoOpenFolderReadme: true,
@@ -1658,6 +1666,7 @@
     const MAX_MARKDOWN_BYTES = 5 * 1024 * 1024;
     const MAX_SPREADSHEET_BYTES = 10 * 1024 * 1024;
     const MAX_HTML_PREVIEW_BYTES = 5 * 1024 * 1024;
+
     const $ = (id) => document.getElementById(id);
     const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1745,6 +1754,8 @@
 
     const rawUrl = (path) =>
       `https://raw.githubusercontent.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/${encodeURIComponent(state.branch)}/${encodePath(path)}`;
+    const jsDelivrDataUrl = () =>
+      `https://data.jsdelivr.com/v1/packages/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(state.branch)}?structure=tree`;
     const contentsApiUrl = (path) => {
       const suffix = path ? `/${encodePath(path)}` : '';
       return `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/contents${suffix}?ref=${encodeURIComponent(state.branch)}`;
@@ -1951,6 +1962,55 @@
 
     const treeApiUrl = (treeSha = state.branch, recursive = false) =>
       `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/git/trees/${encodeURIComponent(treeSha)}${recursive ? '?recursive=1' : ''}`;
+
+    const flattenJsDelivrTree = (nodes, parentPath = '') => {
+      if (!Array.isArray(nodes)) return [];
+      const result = [];
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const nodeName = String(node.name ?? '').replace(/^\/+|\/+$/g, '');
+        const nodePath = node.path || (parentPath && nodeName ? `${parentPath}/${nodeName}` : nodeName);
+        if (!nodePath) continue;
+        const children = Array.isArray(node.files) ? node.files : Array.isArray(node.children) ? node.children : null;
+        const isTree = Boolean(children) || ['directory', 'dir', 'tree'].includes(String(node.type || '').toLowerCase());
+        if (isTree) {
+          result.push({
+            type: 'tree',
+            path: nodePath,
+            size: 0,
+            sha: node.hash || node.sha || '',
+            html_url: '',
+            download_url: ''
+          });
+          if (children) result.push(...flattenJsDelivrTree(children, nodePath));
+        } else {
+          result.push({
+            type: 'blob',
+            path: nodePath,
+            size: Number(node.size || 0),
+            sha: node.hash || node.sha || '',
+            html_url: '',
+            download_url: rawUrl(nodePath)
+          });
+        }
+      }
+      return result;
+    };
+
+    const loadTreeFromJsDelivr = async (signal) => {
+      const response = await fetch(jsDelivrDataUrl(), { signal });
+      if (!response.ok) {
+        const error = new Error(`jsDelivr tree request failed: ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      const data = await response.json();
+      const nodes = Array.isArray(data?.files) ? data.files : Array.isArray(data) ? data : [];
+      const items = flattenJsDelivrTree(nodes);
+      if (!items.length && nodes.length) throw new Error('jsDelivr returned an empty or unsupported tree format.');
+      if (!items.length && !data?.default) throw new Error('jsDelivr returned no repository files.');
+      return { data, items };
+    };
 
     const renderTree = () => {
       const root = state.rootNode;
@@ -2737,30 +2797,36 @@
         setContentHeader('', '', 'Repository');
         $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
         await getRepoInfo(controller.signal);
-        const treeData = await ghApi(treeApiUrl(state.branch, true), controller.signal);
-        if (controller.signal.aborted) return;
-        if (!treeData || !Array.isArray(treeData.tree)) {
-          throw new Error('GitHub returned an unexpected tree response.');
-        }
-
-        if (treeData.truncated) {
-          // GitHub caps recursive tree responses at 100,000 entries or 7 MB.
-          // Use the root tree SHA and load each subtree non-recursively as needed.
-          state.rootNode = makeRootNode();
-          state.rootNode.source = { sha: treeData.sha || '' };
-          state.rootNode.loaded = false;
-          state.tree = [];
-          state.treeIndex = new Map();
-          state.treeFullyLoaded = false;
-          await loadDirectoryNode(state.rootNode, controller.signal);
-          if (!state.rootNode.loaded) {
-            throw state.rootNode.loadError || new Error('Unable to load the repository root.');
+        try {
+          const jsDelivrTree = await loadTreeFromJsDelivr(controller.signal);
+          if (controller.signal.aborted) return;
+          mergeRecursiveTree(jsDelivrTree.items, '');
+        } catch (jsDelivrError) {
+          if (controller.signal.aborted) return;
+          const treeData = await ghApi(treeApiUrl(state.branch, true), controller.signal);
+          if (controller.signal.aborted) return;
+          if (!treeData || !Array.isArray(treeData.tree)) {
+            throw new Error('GitHub returned an unexpected tree response.');
           }
-          $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
-        } else {
-          mergeRecursiveTree(treeData.tree, treeData.sha || '');
-        }
 
+          if (treeData.truncated) {
+            // GitHub caps recursive tree responses at 100,000 entries or 7 MB.
+            // Use the root tree SHA and load each subtree non-recursively as needed.
+            state.rootNode = makeRootNode();
+            state.rootNode.source = { sha: treeData.sha || '' };
+            state.rootNode.loaded = false;
+            state.tree = [];
+            state.treeIndex = new Map();
+            state.treeFullyLoaded = false;
+            await loadDirectoryNode(state.rootNode, controller.signal);
+            if (!state.rootNode.loaded) {
+              throw state.rootNode.loadError || new Error('Unable to load the repository root.');
+            }
+            $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
+          } else {
+            mergeRecursiveTree(treeData.tree, treeData.sha || '');
+          }
+        }
         renderTree();
         updateRepoHeader();
         updateFooter();
@@ -3178,7 +3244,6 @@
       const item = state.repoSearchResults[index];
       if (!item?.full_name) return;
       closeRepoSearch();
-      $('repoSearchInput').value = item.full_name;
       navigateToRepo(item.full_name);
     };
 
@@ -3234,13 +3299,13 @@
       state.treeFullyLoaded = false;
       clearFileMemoryCache();
       navigateToAppRoute(parsed.owner, parsed.repo);
-      input.value = `${parsed.owner}/${parsed.repo}`;
+      input.value = '';
       bootRepo();
       return true;
     };
 
     const syncRepoSearch = () => {
-      $('repoSearchInput').value = state.owner && state.repo ? `${state.owner}/${state.repo}` : '';
+      $('repoSearchInput').value = '';
       $('repoSearchInput').classList.remove('is-invalid');
     };
 
@@ -3306,7 +3371,7 @@
         const details = Array.from(document.querySelectorAll('#tree details.folder-wrap'));
         const expanding = $('btnExpand').getAttribute('aria-label') !== 'Collapse all folders';
         details.forEach((d) => d.open = expanding);
-        $('expandIcon').setAttribute('href', expanding ? '#i-folder' : '#i-chevron');
+        $('btnExpand').classList.toggle('is-expanded', expanding);
         $('btnExpand').title = expanding ? 'Collapse all folders' : 'Expand all folders';
         $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
       });
@@ -3621,7 +3686,7 @@
 
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch((error) => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((error) => {
           console.warn('LiteGH service worker registration failed:', error);
         });
       });
@@ -3630,7 +3695,7 @@
     window.addEventListener('error', (event) => console.error('LiteGH error:', event.message));
     window.addEventListener('unhandledrejection', (event) => console.error('LiteGH unhandled rejection:', event.reason));
 
-    init();
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   </script>
 </body>
 </html>
