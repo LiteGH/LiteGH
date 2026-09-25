@@ -9,16 +9,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="LiteGH">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.png" type="image/png">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
-  <link id="hljsLightTheme" rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <link id="hljsDarkTheme" rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" media="not all">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js" defer></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -608,6 +602,8 @@
       flex: 1;
       overflow: auto;
       padding: 0.15rem 0.45rem 0.7rem;
+      contain: content;
+      overscroll-behavior: contain;
     }
 
     .tree-folder,
@@ -1477,7 +1473,7 @@
     <header class="topbar">
       <button id="btnSidebar" class="icon-btn" type="button" title="Toggle sidebar (Ctrl/⌘ B)" aria-label="Toggle sidebar" aria-expanded="true"><svg class="ui-icon ui-icon-lg" aria-hidden="true"><use href="#i-menu"></use></svg></button>
       <button id="brandButton" class="brand-button" type="button" title="Go to home">
-        <img class="brand-mark" src="icons/icon-32.png" alt="">
+        <img class="brand-mark" src="/icons/icon-32.png" alt="">
         <span class="brand-copy">
           <span class="brand-name">Lite<span>GH</span></span>
           <span id="repoTitle" class="repo-title"></span>
@@ -1592,6 +1588,107 @@
       repoSearchRequest: null,
       repoSearchResults: [],
       repoSearchActiveIndex: -1,
+      markdownImageObserver: null,
+    };
+
+    const THIRD_PARTY = {
+      marked: {
+        src: 'https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js',
+        global: 'marked',
+      },
+      highlight: {
+        src: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js',
+        global: 'hljs',
+      },
+      dompurify: {
+        src: 'https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.16/purify.min.js',
+        global: 'DOMPurify',
+      },
+      xlsx: {
+        src: 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',
+        global: 'XLSX',
+      },
+    };
+
+    const HIGHLIGHT_THEME_URLS = {
+      light: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css',
+      dark: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css',
+    };
+
+    const libraryPromises = new Map();
+    const stylesheetPromises = new Map();
+
+    const loadScript = (key) => {
+      const dependency = THIRD_PARTY[key];
+      if (!dependency) return Promise.reject(new Error(`Unknown library: ${key}`));
+      if (window[dependency.global]) return Promise.resolve(window[dependency.global]);
+      if (libraryPromises.has(key)) return libraryPromises.get(key);
+
+      const promise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = dependency.src;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.dataset.liteghDependency = key;
+        script.onload = () => {
+          const library = window[dependency.global];
+          if (library) resolve(library);
+          else reject(new Error(`Loaded ${key}, but its global is unavailable.`));
+        };
+        script.onerror = () => reject(new Error(`Unable to load ${key}.`));
+        document.head.appendChild(script);
+      });
+
+      libraryPromises.set(key, promise);
+      promise.catch(() => libraryPromises.delete(key));
+      return promise;
+    };
+
+    const loadStylesheet = (key, href) => {
+      if (stylesheetPromises.has(key)) return stylesheetPromises.get(key);
+      const existing = document.querySelector(`link[data-litegh-style="${CSS.escape(key)}"]`);
+      if (existing) return Promise.resolve(existing);
+
+      const promise = new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.dataset.liteghStyle = key;
+        link.onload = () => resolve(link);
+        link.onerror = () => reject(new Error(`Unable to load ${key} stylesheet.`));
+        document.head.appendChild(link);
+      });
+
+      stylesheetPromises.set(key, promise);
+      promise.catch(() => stylesheetPromises.delete(key));
+      return promise;
+    };
+
+    const ensureMarkdown = () => Promise.all([
+      loadScript('marked'),
+      loadScript('dompurify'),
+    ]);
+
+    const ensureHighlight = async () => {
+      await loadScript('highlight');
+      const dark = document.body.classList.contains('dark-mode');
+      await loadStylesheet(dark ? 'hljs-dark' : 'hljs-light', HIGHLIGHT_THEME_URLS[dark ? 'dark' : 'light']);
+      updateHighlightThemeLinks();
+      return window.hljs;
+    };
+
+    const ensureSpreadsheet = () => Promise.all([
+      loadScript('xlsx'),
+      loadScript('dompurify'),
+    ]);
+
+    const updateHighlightThemeLinks = () => {
+      const light = document.querySelector('link[data-litegh-style="hljs-light"]');
+      const dark = document.querySelector('link[data-litegh-style="hljs-dark"]');
+      if (!light && !dark) return;
+      const enabledDark = document.body.classList.contains('dark-mode');
+      if (light) light.media = enabledDark ? 'not all' : 'all';
+      if (dark) dark.media = enabledDark ? 'all' : 'not all';
     };
 
     const cache = new Map();
@@ -1600,7 +1697,9 @@
     const MEMORY_FILE_CACHE_ITEM_MAX_BYTES = 1024 * 1024;
     const SESSION_FILE_CACHE_MAX_BYTES = 1024 * 1024;
     const SESSION_FILE_CACHE_ITEM_MAX_BYTES = 256 * 1024;
-    const fileCacheStorageKey = () => storageKey('fileTextCache');
+    const fileCachePrefix = () => storageKey('fileText');
+    const fileCacheIndexKey = () => storageKey('fileTextIndex');
+
     const getMemoryFileCache = (key) => {
       const value = cache.get(key);
       if (value == null) return null;
@@ -1627,32 +1726,54 @@
       cache.clear();
       memoryCacheBytes = 0;
     };
+    const sessionFileKey = (key) => `${fileCachePrefix()}:${encodeURIComponent(key)}`;
+
     const readSessionFileCache = (key) => {
-      const raw = safeGet(sessionStorage, fileCacheStorageKey());
-      if (!raw) return null;
       try {
+        const raw = sessionStorage.getItem(sessionFileKey(key));
+        if (!raw) return null;
         const parsed = JSON.parse(raw);
-        return parsed[key]?.text ?? null;
+        return typeof parsed?.text === 'string' ? parsed.text : null;
       } catch (_) {
         return null;
       }
     };
+
     const writeSessionFileCache = (key, text) => {
       if (text.length > SESSION_FILE_CACHE_ITEM_MAX_BYTES) return;
-      let parsed = {};
-      try { parsed = JSON.parse(safeGet(sessionStorage, fileCacheStorageKey()) || '{}'); } catch (_) { parsed = {}; }
-      parsed[key] = { text, used: Date.now() };
-      const bytes = (value) => String(value?.text || '').length;
-      let total = Object.values(parsed).reduce((sum, value) => sum + bytes(value), 0);
-      const ordered = Object.entries(parsed).sort(([, a], [, b]) => (a.used || 0) - (b.used || 0));
-      while (total > SESSION_FILE_CACHE_MAX_BYTES && ordered.length) {
-        const [oldKey, oldValue] = ordered.shift();
-        if (oldKey === key && Object.keys(parsed).length === 1) break;
-        total -= bytes(oldValue);
-        delete parsed[oldKey];
+
+      const itemKey = sessionFileKey(key);
+      try {
+        sessionStorage.setItem(itemKey, JSON.stringify({ text, used: Date.now() }));
+
+        let index = [];
+        try {
+          index = JSON.parse(sessionStorage.getItem(fileCacheIndexKey()) || '[]');
+          if (!Array.isArray(index)) index = [];
+        } catch (_) {
+          index = [];
+        }
+
+        index = index.filter((item) => item?.key !== itemKey);
+        index.push({ key: itemKey, bytes: text.length, used: Date.now() });
+
+        let total = index.reduce((sum, item) => sum + (Number(item.bytes) || 0), 0);
+        index.sort((a, b) => (a.used || 0) - (b.used || 0));
+
+        while (total > SESSION_FILE_CACHE_MAX_BYTES && index.length > 1) {
+          const oldest = index.shift();
+          total -= Number(oldest.bytes) || 0;
+          try { sessionStorage.removeItem(oldest.key); } catch (_) {}
+        }
+
+        try {
+          sessionStorage.setItem(fileCacheIndexKey(), JSON.stringify(index));
+        } catch (_) {}
+      } catch (_) {
+        try { sessionStorage.removeItem(itemKey); } catch (_) {}
       }
-      safeSet(sessionStorage, fileCacheStorageKey(), JSON.stringify(parsed));
     };
+
     const blobUrls = new Set();
     const requests = { tree: null, content: null };
     let branchList = null;
@@ -1824,19 +1945,18 @@
     const fetchFileArrayBuffer = async (path, signal) =>
       new Uint8Array(await (await fetchFileResponse(path, signal)).arrayBuffer());
 
+    const HIDDEN_FOLDERS = new Set((CONFIG.hiddenFolders || []).map((value) => value.toLowerCase()));
+    const HIDDEN_FILES = new Set((CONFIG.hiddenFiles || []).map((value) => value.toLowerCase()));
+
     const isVisibleTreeItem = (item) => {
-      const hiddenFolders = new Set((CONFIG.hiddenFolders || []).map((value) => value.toLowerCase()));
-      const hiddenFiles = new Set((CONFIG.hiddenFiles || []).map((value) => value.toLowerCase()));
       const parts = item.path.split('/');
-      if (parts.some((part) => part.startsWith('.') || hiddenFolders.has(part.toLowerCase()))) return false;
+      if (parts.some((part) => part.startsWith('.') || HIDDEN_FOLDERS.has(part.toLowerCase()))) return false;
       if (item.type !== 'blob') return true;
       const lowerName = parts[parts.length - 1].toLowerCase();
-      return !hiddenFiles.has(lowerName) && !hiddenFiles.has(`/${item.path.toLowerCase()}`);
+      return !HIDDEN_FILES.has(lowerName) && !HIDDEN_FILES.has(`/${item.path.toLowerCase()}`);
     };
 
-    const getFileIcon = (name) => {
-      const ext = extOf(name);
-      const map = {
+    const FILE_ICON_MAP = {
         js: ['i-js', 'kind-js'], mjs: ['i-js', 'kind-js'], cjs: ['i-js', 'kind-js'],
         jsx: ['i-js', 'kind-js'], ts: ['i-code', 'kind-ts'], tsx: ['i-code', 'kind-ts'],
         json: ['i-json', 'kind-json'], json5: ['i-json', 'kind-json'],
@@ -1853,7 +1973,9 @@
         zip: ['i-archive', 'kind-archive'], gz: ['i-archive', 'kind-archive'], tgz: ['i-archive', 'kind-archive'], tar: ['i-archive', 'kind-archive'], rar: ['i-archive', 'kind-archive'], '7z': ['i-archive', 'kind-archive'],
         toml: ['i-data', 'kind-data'], yaml: ['i-data', 'kind-data'], yml: ['i-data', 'kind-data'], xml: ['i-code', 'kind-ts'],
       };
-      return map[ext] || ['i-file', ''];
+
+    const getFileIcon = (name) => {
+      return FILE_ICON_MAP[extOf(name)] || ['i-file', ''];
     };
 
     const makeRootNode = () => ({
@@ -1978,34 +2100,47 @@
     const flattenJsDelivrTree = (nodes, parentPath = '') => {
       if (!Array.isArray(nodes)) return [];
       const result = [];
-      for (const node of nodes) {
-        if (!node || typeof node !== 'object') continue;
-        const nodeName = String(node.name ?? '').replace(/^\/+|\/+$/g, '');
-        const nodePath = node.path || (parentPath && nodeName ? `${parentPath}/${nodeName}` : nodeName);
-        if (!nodePath) continue;
-        const children = Array.isArray(node.files) ? node.files : Array.isArray(node.children) ? node.children : null;
-        const isTree = Boolean(children) || ['directory', 'dir', 'tree'].includes(String(node.type || '').toLowerCase());
-        if (isTree) {
-          result.push({
-            type: 'tree',
-            path: nodePath,
-            size: 0,
-            sha: node.hash || node.sha || '',
-            html_url: '',
-            download_url: ''
-          });
-          if (children) result.push(...flattenJsDelivrTree(children, nodePath));
-        } else {
-          result.push({
-            type: 'blob',
-            path: nodePath,
-            size: Number(node.size || 0),
-            sha: node.hash || node.sha || '',
-            html_url: '',
-            download_url: rawUrl(nodePath)
-          });
+      const stack = [{ nodes, parentPath }];
+
+      while (stack.length) {
+        const frame = stack.pop();
+        for (let index = frame.nodes.length - 1; index >= 0; index -= 1) {
+          const node = frame.nodes[index];
+          if (!node || typeof node !== 'object') continue;
+          const nodeName = String(node.name ?? '').replace(/^\/+|\/+$/g, '');
+          const nodePath = node.path || (frame.parentPath && nodeName ? `${frame.parentPath}/${nodeName}` : nodeName);
+          if (!nodePath) continue;
+
+          const children = Array.isArray(node.files)
+            ? node.files
+            : Array.isArray(node.children)
+              ? node.children
+              : null;
+          const isTree = Boolean(children) || ['directory', 'dir', 'tree'].includes(String(node.type || '').toLowerCase());
+
+          if (isTree) {
+            result.push({
+              type: 'tree',
+              path: nodePath,
+              size: 0,
+              sha: node.hash || node.sha || '',
+              html_url: '',
+              download_url: ''
+            });
+            if (children?.length) stack.push({ nodes: children, parentPath: nodePath });
+          } else {
+            result.push({
+              type: 'blob',
+              path: nodePath,
+              size: Number(node.size || 0),
+              sha: node.hash || node.sha || '',
+              html_url: '',
+              download_url: rawUrl(nodePath)
+            });
+          }
         }
       }
+
       return result;
     };
 
@@ -2350,11 +2485,13 @@
         $('contentBody').replaceChildren(notice, wrap);
         return;
       }
+      await ensureMarkdown();
+      if (signal.aborted) return;
       const currentDir = path.includes('/') ? path.split('/').slice(0, -1).join('/') : '';
-      const html = marked.parse(text, { breaks: false, gfm: true });
+      const html = window.marked.parse(text, { breaks: false, gfm: true });
       const wrapper = document.createElement('div');
       wrapper.className = 'markdown-body';
-      wrapper.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] });
+      wrapper.innerHTML = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] });
 
       const used = new Set();
       wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
@@ -2387,43 +2524,82 @@
         });
       });
 
-      const imageJobs = Array.from(wrapper.querySelectorAll('img[src]')).map(async (img) => {
+      if (state.markdownImageObserver) {
+        state.markdownImageObserver.disconnect();
+        state.markdownImageObserver = null;
+      }
+
+      const markdownImages = Array.from(wrapper.querySelectorAll('img[src]'));
+      const loadMarkdownImage = async (img) => {
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.referrerPolicy = 'no-referrer';
+
         const src = img.getAttribute('src') || '';
         if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) {
-          if (/^https:\/\//i.test(src)) img.referrerPolicy = 'no-referrer';
           return;
         }
         const clean = src.split(/[?#]/, 1)[0];
         if (!clean) return;
         try {
-          img.loading = 'lazy';
-          img.referrerPolicy = 'no-referrer';
           img.src = await resolveMediaUrl(resolveRepoPath(clean, currentDir), signal);
-        } catch (_) { /* keep broken image */ }
-      });
+        } catch (_) {}
+      };
 
-      wrapper.querySelectorAll('pre code').forEach((code) => {
-        try { hljs.highlightElement(code); } catch (_) { /* plain */ }
-      });
+      const setupMarkdownImages = () => {
+        if (!markdownImages.length) return;
+        if (!('IntersectionObserver' in window)) {
+          markdownImages.forEach((img) => loadMarkdownImage(img));
+          return;
+        }
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            loadMarkdownImage(entry.target);
+          });
+        }, {
+          root: $('content'),
+          rootMargin: '240px 0px',
+        });
+        state.markdownImageObserver = observer;
+        markdownImages.forEach((img) => observer.observe(img));
+      };
 
       $('contentBody').replaceChildren(wrapper);
-      await Promise.allSettled(imageJobs);
+      setupMarkdownImages();
+
+      const codeBlocks = Array.from(wrapper.querySelectorAll('pre code'));
+      if (codeBlocks.length) {
+        try {
+          await ensureHighlight();
+          if (signal.aborted) return;
+          codeBlocks.forEach((code) => {
+            try { window.hljs.highlightElement(code); } catch (_) { /* plain */ }
+          });
+        } catch (_) { /* plain */ }
+      }
+
       if (signal.aborted) return;
       if (anchor) scrollToAnchor(anchor);
     };
 
-    const renderCode = (text, ext) => {
+    const renderCode = async (text, ext) => {
       const code = document.createElement('code');
       code.textContent = text;
-      if (ext && text.length <= 500 * 1024) {
-        try { hljs.highlightElement(code); } catch (_) { /* plain */ }
-      }
       const pre = document.createElement('pre');
       pre.appendChild(code);
       const wrap = document.createElement('div');
       wrap.className = 'source-block';
       wrap.appendChild(pre);
       $('contentBody').replaceChildren(wrap);
+
+      if (ext && text.length <= 500 * 1024) {
+        try {
+          await ensureHighlight();
+          window.hljs.highlightElement(code);
+        } catch (_) { /* plain */ }
+      }
     };
 
     const renderHtml = (text, ext) => {
@@ -2506,7 +2682,7 @@
       $('contentBody').replaceChildren(iframe);
     };
 
-    const renderSpreadsheet = (data, signal) => {
+    const renderSpreadsheet = async (data, signal) => {
       if (signal.aborted) return;
       if (data.byteLength > MAX_SPREADSHEET_BYTES) {
         const notice = document.createElement('div');
@@ -2515,13 +2691,15 @@
         $('contentBody').replaceChildren(notice);
         return;
       }
+      await ensureSpreadsheet();
+      if (signal.aborted) return;
       try {
         let workbook;
         const ext = extOf(state.currentFilePath);
         if (ext === 'csv') {
-          workbook = XLSX.read(new TextDecoder().decode(data), { type: 'string' });
+          workbook = window.XLSX.read(new TextDecoder().decode(data), { type: 'string' });
         } else {
-          workbook = XLSX.read(data, { type: 'array' });
+          workbook = window.XLSX.read(data, { type: 'array' });
         }
         const wrapper = document.createElement('div');
         wrapper.className = 'source-block';
@@ -2529,8 +2707,8 @@
           const section = document.createElement('section');
           section.className = 'sheet';
           section.innerHTML = `<h3>${escapeHTML(sheetName)}</h3>`;
-          const raw = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
-          const clean = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+          const raw = window.XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
+          const clean = window.DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
           const holder = document.createElement('div');
           holder.innerHTML = clean;
           section.appendChild(holder.firstElementChild || holder);
@@ -2593,8 +2771,8 @@
       return fetchFileBlob(path, undefined, signal);
     };
 
-    const viewRaw = (text) => {
-      renderCode(text, extOf(state.currentFilePath));
+    const viewRaw = async (text) => {
+      await renderCode(text, extOf(state.currentFilePath));
     };
 
     const selectFile = async (path, anchor = '', historyMode = 'push') => {
@@ -2642,7 +2820,7 @@
         } else if (SHEET_EXTS.includes(ext)) {
           const data = await fetchFileArrayBuffer(path, signal);
           if (signal.aborted) return;
-          renderSpreadsheet(data, signal);
+          await renderSpreadsheet(data, signal);
         } else {
           const text = await fetchFileText(path, signal);
           if (signal.aborted) return;
@@ -2657,7 +2835,7 @@
           } else if (ext === 'html' || ext === 'htm') {
             renderHtml(text, ext);
           } else {
-            renderCode(text, ext);
+            await renderCode(text, ext);
           }
         }
 
@@ -2727,6 +2905,10 @@
     const abortContentRequest = () => {
       requests.content?.abort();
       requests.content = null;
+      if (state.markdownImageObserver) {
+        state.markdownImageObserver.disconnect();
+        state.markdownImageObserver = null;
+      }
     };
 
     const abortTreeRequest = () => {
@@ -2809,7 +2991,11 @@
       try {
         setContentHeader('', '');
         $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
-        await getRepoInfo(controller.signal);
+        if (!state.branch) {
+          await getRepoInfo(controller.signal);
+        } else {
+          state.defaultBranch = state.branch;
+        }
         try {
           const jsDelivrTree = await loadTreeFromJsDelivr(controller.signal);
           if (controller.signal.aborted) return;
@@ -3192,10 +3378,8 @@
       document.body.classList.toggle('dark-mode', enabled);
       $('darkModeIcon').setAttribute('href', enabled ? '#i-sun' : '#i-moon');
       $('btnDark').setAttribute('aria-pressed', String(enabled));
-      const lightTheme = $('hljsLightTheme');
-      const darkTheme = $('hljsDarkTheme');
-      lightTheme.media = enabled ? 'not all' : 'all';
-      darkTheme.media = enabled ? 'all' : 'not all';
+      updateHighlightThemeLinks();
+      if (window.hljs) ensureHighlight().catch(() => {});
       safeSet(localStorage, storageKey('darkMode'), String(enabled));
     };
 
@@ -3221,7 +3405,7 @@
           const avatarUrl = /^https:\/\//i.test(item.owner?.avatar_url || '') ? item.owner.avatar_url : '';
           return `<button class="repo-search-result" type="button" role="option" data-result-index="${index}">
             <span class="repo-search-result-top">
-              ${avatarUrl ? `<img class="repo-avatar" src="${escapeHTML(avatarUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="repo-avatar placeholder" aria-hidden="true"></span>'}
+              ${avatarUrl ? `<img class="repo-avatar" src="${escapeHTML(avatarUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="repo-avatar placeholder" aria-hidden="true"></span>'}
               <span class="repo-search-name">${escapeHTML(item.full_name || `${item.owner?.login || ''}/${item.name || ''}`)}</span>
             </span>
             <span class="repo-search-meta"><span>★ ${Number(item.stargazers_count || 0).toLocaleString()}</span><span>${escapeHTML(language)}</span><span>Updated ${escapeHTML(formatRelativeDate(item.updated_at))}</span></span>
@@ -3440,7 +3624,7 @@
       const current = Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--font-size'), 10) || 16;
       const next = Math.min(36, Math.max(10, current + delta));
       document.documentElement.style.setProperty('--font-size', `${next}px`);
-      safeSet(localStorage, storageKey('fontSize'), `${next}px`);
+      if (delta !== 0) safeSet(localStorage, storageKey('fontSize'), `${next}px`);
       $('btnFontDec').title = `Decrease font size · currently ${next}px`;
       $('btnFontInc').title = `Increase font size · currently ${next}px`;
     };
@@ -3521,7 +3705,7 @@
         setViewPreference(ext, next);
         button.setAttribute('aria-pressed', String(next === 'raw'));
         if (lastRawText !== null) {
-          if (next === 'raw') viewRaw(lastRawText);
+          if (next === 'raw') await viewRaw(lastRawText);
           else if (MARKDOWN_EXTS.includes(ext)) await renderMarkdown(lastRawText, state.currentFilePath, requests.content?.signal || new AbortController().signal);
           else if (ext === 'svg') renderSvg(lastRawText, state.currentFilePath.split('/').pop());
           else renderHtml(lastRawText, ext);
@@ -3598,14 +3782,20 @@
               await resolveMediaUrl(item.path, new AbortController().signal);
             } else if (SHEET_EXTS.includes(ext)) {
               const data = await fetchFileArrayBuffer(item.path, new AbortController().signal);
-              XLSX.read(ext === 'csv' ? new TextDecoder().decode(data) : data, { type: ext === 'csv' ? 'string' : 'array' });
+              await ensureSpreadsheet();
+              window.XLSX.read(ext === 'csv' ? new TextDecoder().decode(data) : data, { type: ext === 'csv' ? 'string' : 'array' });
             } else if (AUDIO_EXTS.includes(ext) || VIDEO_EXTS.includes(ext) || ext === 'pdf') {
               const url = await fetchFileBlob(item.path, ext === 'pdf' ? 'application/pdf' : undefined, new AbortController().signal);
               URL.revokeObjectURL(url);
             } else {
               const text = await fetchFileText(item.path, new AbortController().signal);
-              if (MARKDOWN_EXTS.includes(ext)) DOMPurify.sanitize(marked.parse(text));
-              else if (ext === 'svg') DOMPurify.sanitize(text);
+              if (MARKDOWN_EXTS.includes(ext)) {
+                await ensureMarkdown();
+                window.DOMPurify.sanitize(window.marked.parse(text));
+              } else if (ext === 'svg') {
+                await loadScript('dompurify');
+                window.DOMPurify.sanitize(text);
+              }
             }
             result = { status: 'pass', icon: '✓', detail: 'loaded' };
             pass += 1;
@@ -3648,6 +3838,7 @@
       const nextRepo = `${CONFIG.owner}/${CONFIG.repo}`;
       if (previousRepo !== nextRepo) {
         branchList = null;
+        state.repoUpdated = '';
         clearFileMemoryCache();
         clearBlobUrls();
       }
