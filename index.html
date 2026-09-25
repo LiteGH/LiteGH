@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="LiteGH">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/icons/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
@@ -1534,14 +1534,14 @@
           </div>
           <div id="contentBody" class="content-body">
             <div id="homeState" class="empty-state" hidden>
-              <h1>Browse a GitHub repository</h1>
-              <p>LiteGH runs entirely in your browser. Open a repository from the search bar, or append <code>{user}/{repo}</code> to the URL, or browse the <a href="/litegh/litegh.github.io">LiteGH Repository</a>.</p>
+              <h1>Welcome to LiteGH!</h1>
+              <p>LiteGH is a lightweight Github repository browser. Open a repo from the search bar, go to <code>https://litegh.com/{user}/{repo}</code>, or browse the <a href="/LiteGH/LiteGH">LiteGH repository</a>.</p>
             </div>
           </div>
           <footer class="app-footer">
             <span id="footerText">LiteGH · browser-only GitHub repository viewer</span>
             <span class="footer-links">
-              <a href="https://github.com/litegh/litegh.github.io" target="_blank" rel="noopener noreferrer">Source</a>
+              <a href="https://github.com/LiteGH/LiteGH" target="_blank" rel="noopener noreferrer">Source</a>
               <a id="licenseLink" href="#" target="_blank" rel="noopener noreferrer" hidden>License</a>
             </span>
           </footer>
@@ -1562,15 +1562,15 @@
       appName: '',
       subtitle: '',
       storagePrefix: 'litegh',
-      sourceRepoUrl: 'https://github.com/litegh/litegh.github.io',
+      sourceRepoUrl: 'https://github.com/LiteGH/LiteGH',
       autoOpenFolderReadme: true,
       hiddenFolders: [],
       hiddenFiles: [],
     };
 
     const state = {
-      owner: 'litegh',
-      repo: 'litegh.github.io',
+      owner: '',
+      repo: '',
       branch: '',
       defaultBranch: '',
       repoUpdated: '',
@@ -2029,7 +2029,7 @@
             type: 'tree',
             path: item.path,
             children: Object.create(null),
-            loaded: true,
+            loaded: false,
             loading: false,
             request: null,
             source: item,

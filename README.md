@@ -1,28 +1,28 @@
-<p align="center"><img src="icons/logo-horizontal.png" alt="LiteGH" width="490" height="160"></p>
+<p align="center"><a href="https://litegh.com"><img src="icons/logo-horizontal.png" alt="LiteGH" width="490" height="160"></a></p>
 
-# [LiteGH](https://litegh.github.io)
+# [LiteGH](https://litegh.com)
 
 A minimal, lightweight GitHub repository browser for older devices in a single HTML file.
 
 ## Usage
 
-Just replace **`github.com`** with **`litegh.github.io`** to browse any GitHub repo blazingly fast.
+Just replace **`github.com`** with **`litegh.com`** to browse any GitHub repo blazingly fast.
 
-For instance, just replace [**github.com**/litegh/litegh.github.io](https://github.com/litegh/litegh.github.io) with [**litegh.github.io**/litegh/litegh.github.io](https://litegh.github.io/litegh/litegh.github.io) to browse this repo in LiteGH.
+For instance, just replace [**github.com**/LiteGH/LiteGH](https://github.com/LiteGH/LiteGH) with [**litegh.com**/LiteGH/LiteGH](https://litegh.com/LiteGH/LiteGH) to browse this repo in LiteGH.
 
 ### Examples
 
 Open a repository:
 
-`https://litegh.github.io/{user}/{repo}`
+`https://litegh.com/{user}/{repo}`
 
 Open a specific branch:
 
-`https://litegh.github.io/{user}/{repo}/tree/{branch}`
+`https://litegh.com/{user}/{repo}/tree/{branch}`
 
 Open a file in a repository:
 
-`https://litegh.github.io/{user}/{repo}/blob/{branch}/{file}`
+`https://litegh.com/{user}/{repo}/blob/{branch}/{file}`
 
 Public GitHub repositories work without a token; a GitHub token can be added in LiteGH for private repositories or higher API limits.
 
