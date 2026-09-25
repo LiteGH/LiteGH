@@ -348,8 +348,12 @@
 
     .brand-name {
       font-size: 1.1rem;
-      font-weight: 720;
+      font-weight: 700;
       white-space: nowrap;
+    }
+
+    .brand-name span {
+      color: #1a69fb;
     }
 
     .repo-title {
@@ -543,7 +547,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      padding: 0.7rem 0.8rem 0.55rem;
+      padding: 0.7rem 0.8rem;
       border-bottom: 1px solid var(--border);
     }
 
@@ -789,7 +793,8 @@
       top: 0;
       z-index: 5;
       margin: 0 -1.25rem;
-      padding: 0.72rem 1.25rem;
+      padding: 0.7rem 1.25rem;
+      min-height: 3.4rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -828,7 +833,7 @@
 
     .crumb-file {
       color: var(--text);
-      font-weight: 690;
+      font-weight: 700;
     }
 
     .file-actions {
@@ -907,7 +912,7 @@
     .form-label {
       font-size: 0.76rem;
       color: var(--muted);
-      font-weight: 680;
+      font-weight: 700;
     }
 
     .form-input {
@@ -1224,7 +1229,7 @@
 
     .sheet th {
       background: var(--surface-2);
-      font-weight: 690;
+      font-weight: 700;
     }
 
     .selftest-table {
@@ -1474,7 +1479,7 @@
       <button id="brandButton" class="brand-button" type="button" title="Go to home">
         <img class="brand-mark" src="icons/icon-32.png" alt="">
         <span class="brand-copy">
-          <span class="brand-name">LiteGH</span>
+          <span class="brand-name">Lite<span>GH</span></span>
           <span id="repoTitle" class="repo-title"></span>
         </span>
       </button>
@@ -1528,11 +1533,11 @@
       <section id="content" class="content" aria-live="polite">
         <div class="content-inner">
           <div id="contentHead" class="content-head">
-            <div id="breadcrumbs" class="breadcrumbs"><span class="crumb-file">Content</span></div>
+            <div id="breadcrumbs" class="breadcrumbs"><span class="crumb-file"></span></div>
             <div id="fileActions" class="file-actions"></div>
           </div>
           <div id="contentBody" class="content-body">
-            <div id="homeState" class="empty-state">
+            <div id="homeState" class="empty-state" hidden>
               <h1>Browse a GitHub repository</h1>
               <p>LiteGH runs entirely in your browser. Open a repository from the search bar, or append <code>{user}/{repo}</code> to the URL, or browse the <a href="/litegh/litegh.github.io">LiteGH Repository</a>.</p>
             </div>
@@ -2542,7 +2547,7 @@
 
     const setContentHeader = (path, ext, plainTitle = '') => {
       if (!path) {
-        $('breadcrumbs').innerHTML = `<span class="crumb-file">${escapeHTML(plainTitle || 'Content')}</span>`;
+        $('breadcrumbs').innerHTML = `<span class="crumb-file">${escapeHTML(plainTitle)}</span>`;
         $('fileActions').innerHTML = '';
         return;
       }
@@ -2691,8 +2696,7 @@
       updateBranchControl();
       $('tree').replaceChildren();
       $('fileCount').textContent = '—';
-      setContentHeader('', '', 'Browse a GitHub repository');
-      const homeState = $('homeState');
+      setContentHeader('', '');
       const fragment = document.createDocumentFragment();
       if (message) {
         const notice = document.createElement('div');
@@ -2701,7 +2705,11 @@
         notice.textContent = message;
         fragment.appendChild(notice);
       }
-      if (homeState) fragment.appendChild(homeState);
+      const homeState = $('homeState');
+      if (homeState) {
+        homeState.hidden = false;
+        fragment.appendChild(homeState);
+      }
       $('contentBody').replaceChildren(fragment);
       updateFooter();
       safeRemove(localStorage, storageKey('repo'));
@@ -2799,7 +2807,7 @@
       const controller = new AbortController();
       requests.tree = controller;
       try {
-        setContentHeader('', '', 'Repository');
+        setContentHeader('', '');
         $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
         await getRepoInfo(controller.signal);
         try {
