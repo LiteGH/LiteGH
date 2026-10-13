@@ -30,7 +30,7 @@ Public GitHub repositories work without a token; a GitHub token can be added in 
 
 Compare the web performance of loading GitHub vs LiteGH using [WebPageTest](https://www.webpagetest.org):
 
-[![GitHub vs LiteGH](images/github-vs-litegh-thumb.webp)](images/github-vs-litegh.webp)
+[![GitHub vs LiteGH](images/github-vs-litegh-thumb.webp)](https://raw.githubusercontent.com/LiteGH/LiteGH/main/images/github-vs-litegh.webp)
 
 ## Authors
 
