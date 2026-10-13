@@ -408,7 +408,8 @@
       white-space: nowrap;
     }
 
-    .branch-glyph {
+    .branch-glyph,
+    .code-glyph {
       flex: 0 0 auto;
       font-size: 0.95em;
       line-height: 1;
@@ -1736,7 +1737,7 @@
             <div id="fileCount" class="file-count">—</div>
           </div>
           <div id="codeControl" class="code-control" hidden>
-            <button id="btnCode" class="branch-button code-button" type="button" aria-haspopup="dialog" aria-expanded="false" title="Code and download"><svg class="ui-icon" aria-hidden="true"><use href="#i-code"></use></svg><span>Code</span><svg class="ui-icon code-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+            <button id="btnCode" class="branch-button code-button" type="button" aria-haspopup="dialog" aria-expanded="false" title="Code and download"><span class="code-glyph" aria-hidden="true">‹›</span><span>Code</span><svg class="ui-icon code-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
             <div id="codeMenu" class="code-menu" role="dialog" aria-label="Code and download" hidden>
               <div class="code-tabs" role="tablist" aria-label="Clone method">
                 <button class="code-tab is-active" type="button" role="tab" aria-selected="true" data-clone="https">HTTPS</button>
