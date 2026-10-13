@@ -1,4 +1,4 @@
-<p align="center"><a href="https://litegh.com"><img src="icons/logo-horizontal.png" alt="LiteGH" width="490" height="160"></a></p>
+<p align="center"><a href="https://litegh.com"><img src="images/logo-horizontal.webp" alt="LiteGH" width="490" height="160"></a></p>
 
 # [LiteGH](https://litegh.com)
 
@@ -26,8 +26,14 @@ Open a file in a repository:
 
 Public GitHub repositories work without a token; a GitHub token can be added in LiteGH for private repositories or higher API limits.
 
+## Performance
+
+Compare the web performance of loading GitHub vs LiteGH using [WebPageTest](https://www.webpagetest.org):
+
+[![GitHub vs LiteGH](images/github-vs-litegh-thumb.webp)](images/github-vs-litegh.webp)
+
 ## Authors
 
-LiteGH is created by [niutech](https://github.com/niutech), based on [TooToo by pushme-pullyou](https://github.com/pushme-pullyou/tootoo) under MIT license.
+LiteGH is created by [niu tech](https://github.com/niutech), based on [TooToo by pushme-pullyou](https://github.com/pushme-pullyou/tootoo) under MIT license.
 
 It is not affiliated with GitHub, Inc.
