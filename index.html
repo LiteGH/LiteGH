@@ -457,12 +457,107 @@
       color: var(--accent);
     }
 
-    #btnExpand .ui-icon {
+    .code-control {
+      position: relative;
+    }
+
+    .code-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+    }
+
+    .code-button .code-chevron {
+      width: 0.82rem;
+      height: 0.82rem;
+      flex-basis: 0.82rem;
       transition: transform var(--transition);
     }
 
-    #btnExpand.is-expanded .ui-icon {
+    .code-button[aria-expanded="true"] .code-chevron {
       transform: rotate(180deg);
+    }
+
+    .code-menu {
+      position: absolute;
+      top: calc(100% + 0.3rem);
+      right: 0;
+      z-index: 30;
+      width: min(28rem, 78vw);
+      padding: 0.6rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }
+
+    .code-tabs {
+      display: flex;
+      gap: 0.15rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.55rem;
+    }
+
+    .code-tab {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0.4rem 0.55rem;
+      border-bottom: 0.12rem solid transparent;
+      cursor: pointer;
+      font-size: 0.72rem;
+    }
+
+    .code-tab:hover,
+    .code-tab.is-active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+
+    .clone-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .clone-input {
+      min-width: 0;
+      flex: 1;
+      height: 2rem;
+      padding: 0.4rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 0.45rem;
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      outline: none;
+    }
+
+    .clone-copy {
+      flex: 0 0 2rem;
+    }
+
+    .download-zip {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.55rem;
+      padding: 0.35rem 0.2rem 0.1rem;
+      color: var(--text);
+      font-size: 0.74rem;
+      text-decoration: none;
+    }
+
+    .download-zip:hover {
+      color: var(--accent);
+    }
+
+    .sidebar-head-left {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
     }
 
     .workspace {
@@ -532,6 +627,36 @@
     }
 
     .repo-summary-name a:hover {
+      color: var(--accent);
+    }
+
+    .repo-summary-fork {
+      display: flex;
+      align-items: center;
+      gap: 0.22rem;
+      margin: -0.08rem 0 0.3rem 1.18rem;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 0.64rem;
+      line-height: 1.2;
+    }
+
+    .repo-summary-fork .ui-icon {
+      width: 0.72rem;
+      height: 0.72rem;
+      flex: 0 0 0.72rem;
+    }
+
+    .repo-summary-fork a {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .repo-summary-fork a:hover {
       color: var(--accent);
     }
 
@@ -1511,6 +1636,7 @@
       <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M6 3.5h8l4 4V20.5H6zM14 3.5v4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11.5h8M8 15h8M11 10v7M15 10v7" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
       <symbol id="i-archive" viewBox="0 0 24 24"><path d="M4 6h16v12H4zM4 6l2-2h12l2 2M10 10h4M10 14h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 18.5h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8 11l4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5h6l1.8 2h9.2v9.5H3.5zM3.5 7.5V5.5h6.2l1.6 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
       <symbol id="i-raw" viewBox="0 0 24 24"><path d="m9 7-5 5 5 5M15 7l5 5-5 5M13 5l-2 14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
@@ -1524,6 +1650,8 @@
       <symbol id="i-fork" viewBox="0 0 24 24"><circle cx="7" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 8v3c0 2 2 3 4 3h4M17 8v8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
       <symbol id="i-eye" viewBox="0 0 24 24"><path d="M3.5 12s3.1-5 8.5-5 8.5 5 8.5 5-3.1 5-8.5 5-8.5-5-8.5-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
       <symbol id="i-link" viewBox="0 0 24 24"><path d="M9.5 14.5 14.5 9.5M8.2 16.8l-1.1 1.1a3.3 3.3 0 0 1-4.7-4.7l4.1-4.1a3.3 3.3 0 0 1 4.7 0M15.8 7.2l1.1-1.1a3.3 3.3 0 0 1 4.7 4.7l-4.1 4.1a3.3 3.3 0 0 1-4.7 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-language" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.8 12h16.4M12 3.5c2.2 2.3 3.2 5.2 3.2 8.5s-1 6.2-3.2 8.5c-2.2-2.3-3.2-5.2-3.2-8.5S9.8 5.8 12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
       <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </defs>
@@ -1564,12 +1692,28 @@
       <aside id="sidebar" class="sidebar" aria-label="Repository files">
         <div id="repoSummary" class="repo-summary" hidden></div>
         <div class="sidebar-head">
-          <div id="branchControl" class="branch-control" hidden>
-            <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"></button>
-            <div id="branchMenu" class="branch-menu" role="listbox" aria-label="Branches" hidden></div>
+          <div class="sidebar-head-left">
+            <div id="branchControl" class="branch-control" hidden>
+              <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"></button>
+              <div id="branchMenu" class="branch-menu" role="listbox" aria-label="Branches" hidden></div>
+            </div>
+            <div id="fileCount" class="file-count">—</div>
           </div>
-          <div id="fileCount" class="file-count">—</div>
-          <button id="btnExpand" class="icon-btn" type="button" title="Expand all folders" aria-label="Expand all folders"><svg class="ui-icon" aria-hidden="true"><use id="expandIcon" href="#i-chevron"></use></svg></button>
+          <div id="codeControl" class="code-control" hidden>
+            <button id="btnCode" class="branch-button code-button" type="button" aria-haspopup="dialog" aria-expanded="false" title="Code and download"><svg class="ui-icon" aria-hidden="true"><use href="#i-code"></use></svg><span>Code</span><svg class="ui-icon code-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
+            <div id="codeMenu" class="code-menu" role="dialog" aria-label="Code and download" hidden>
+              <div class="code-tabs" role="tablist" aria-label="Clone method">
+                <button class="code-tab is-active" type="button" role="tab" aria-selected="true" data-clone="https">HTTPS</button>
+                <button class="code-tab" type="button" role="tab" aria-selected="false" data-clone="ssh">SSH</button>
+                <button class="code-tab" type="button" role="tab" aria-selected="false" data-clone="cli">GitHub CLI</button>
+              </div>
+              <div class="clone-row">
+                <input id="cloneUrl" class="clone-input" type="text" readonly spellcheck="false" aria-label="Clone command or URL">
+                <button id="btnCopyClone" class="icon-btn clone-copy" type="button" title="Copy clone URL" aria-label="Copy clone URL"><svg class="ui-icon" aria-hidden="true"><use href="#i-copy"></use></svg></button>
+              </div>
+              <a id="downloadZip" class="download-zip" href="#" target="_blank" rel="noopener noreferrer"><svg class="ui-icon" aria-hidden="true"><use href="#i-download"></use></svg><span>Download ZIP</span></a>
+            </div>
+          </div>
         </div>
         <div class="filter-wrap">
           <div class="filter-box">
@@ -1600,7 +1744,7 @@
           <footer class="app-footer">
             <span id="footerText">LiteGH · browser-only GitHub repository viewer</span>
             <span class="footer-links">
-              <a href="https://github.com/LiteGH/LiteGH" target="_blank" rel="noopener noreferrer">Source</a>
+              <a href="https://github.com/LiteGH/LiteGH" target="_blank" rel="noopener noreferrer">Source</a> ·
               <a id="licenseLink" href="#" target="_blank" rel="noopener noreferrer" hidden>License</a>
             </span>
           </footer>
@@ -1635,6 +1779,9 @@
       repoStars: 0,
       repoForks: 0,
       repoWatchers: 0,
+      repoLanguage: '',
+      repoPrivate: false,
+      repoForkParent: null,
       tree: null,
       rootNode: null,
       treeVersion: 0,
@@ -1651,6 +1798,9 @@
       repoSearchResults: [],
       repoSearchActiveIndex: -1,
       markdownImageObserver: null,
+      cdnVersion: 'HEAD',
+      pendingInitialReadme: false,
+      codeCloneType: 'https',
     };
 
     const THIRD_PARTY = {
@@ -1960,8 +2110,13 @@
 
     const rawUrl = (path) =>
       `https://raw.githubusercontent.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/${encodeURIComponent(state.branch)}/${encodePath(path)}`;
-    const jsDelivrDataUrl = () =>
-      `https://data.jsdelivr.com/v1/packages/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(state.branch)}?structure=tree`;
+    const jsDelivrVersion = (version = state.cdnVersion || state.branch || 'HEAD') => version || 'HEAD';
+    const jsDelivrDirectoryUrl = (version = jsDelivrVersion(), path = '') => {
+      const suffix = path ? `/${encodePath(path)}` : '';
+      return `https://cdn.jsdelivr.net/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}${suffix}/`;
+    };
+    const jsDelivrDataUrl = (version = jsDelivrVersion()) =>
+      `https://data.jsdelivr.com/v1/packages/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}?structure=tree`;
     const contentsApiUrl = (path) => {
       const suffix = path ? `/${encodePath(path)}` : '';
       return `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/contents${suffix}?ref=${encodeURIComponent(state.branch)}`;
@@ -2085,7 +2240,7 @@
       return path.split('/').reduce((node, part) => node?.children?.[part], state.rootNode);
     };
 
-    const mergeTreeEntries = (node, items) => {
+    const mergeTreeEntries = (node, items, sourceMeta = null) => {
       for (const rawItem of items) {
         if (!rawItem?.path || !['blob', 'tree'].includes(rawItem.type)) continue;
         const item = normalizeTreeEntry(rawItem);
@@ -2108,7 +2263,7 @@
             source: item,
           };
           child.path = item.path;
-          child.source = item;
+          child.source = sourceMeta ? { ...item, ...sourceMeta } : item;
           node.children[name] = child;
         } else {
           node.children[name] = item;
@@ -2208,7 +2363,7 @@
               size: Number(node.size || 0),
               sha: node.hash || node.sha || '',
               html_url: '',
-              download_url: rawUrl(nodePath)
+              download_url: ''
             });
           }
         }
@@ -2217,8 +2372,61 @@
       return result;
     };
 
-    const loadTreeFromJsDelivr = async (signal) => {
-      const response = await fetch(jsDelivrDataUrl(), { signal });
+    const parseJsDelivrDirectory = (html, directoryPath = '') => {
+      const documentFragment = new DOMParser().parseFromString(html, 'text/html');
+      const baseUrl = jsDelivrDirectoryUrl(jsDelivrVersion(), directoryPath);
+      const basePath = new URL(baseUrl).pathname;
+      const items = [];
+      const seen = new Set();
+
+      documentFragment.querySelectorAll('.listing a[href]').forEach((link) => {
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        let url;
+        try { url = new URL(href, baseUrl); } catch (_) { return; }
+        if (url.origin !== 'https://cdn.jsdelivr.net') return;
+        if (!url.pathname.startsWith(basePath)) return;
+
+        const relative = url.pathname.slice(basePath.length);
+        const segments = relative.split('/').filter(Boolean);
+        if (segments.length !== 1) return;
+
+        let name;
+        try { name = decodeURIComponent(segments[0]); } catch (_) { return; }
+        if (!name || name === '.' || name === '..') return;
+        if (seen.has(name)) return;
+        seen.add(name);
+
+        const isDirectory = /\/$/.test(url.pathname) || /\/$/.test(href);
+        const path = directoryPath ? `${directoryPath}/${name}` : name;
+        const item = {
+          type: isDirectory ? 'tree' : 'blob',
+          path,
+          size: 0,
+          sha: '',
+          html_url: '',
+          download_url: ''
+        };
+        if (isVisibleTreeItem(item)) items.push(item);
+      });
+
+      if (!items.length) throw new Error(`jsDelivr returned no visible entries for ${directoryPath || 'repository root'}.`);
+      return items;
+    };
+
+    const loadTreeFromJsDelivrDirectory = async (signal, version = jsDelivrVersion(), path = '') => {
+      const response = await fetch(jsDelivrDirectoryUrl(version, path), { signal });
+      if (!response.ok) {
+        const error = new Error(`jsDelivr directory request failed: ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      const html = await response.text();
+      return { version, path, items: parseJsDelivrDirectory(html, path) };
+    };
+
+    const loadTreeFromJsDelivrData = async (signal, version = jsDelivrVersion()) => {
+      const response = await fetch(jsDelivrDataUrl(version), { signal });
       if (!response.ok) {
         const error = new Error(`jsDelivr tree request failed: ${response.status}`);
         error.status = response.status;
@@ -2229,7 +2437,16 @@
       const items = flattenJsDelivrTree(nodes);
       if (!items.length && nodes.length) throw new Error('jsDelivr returned an empty or unsupported tree format.');
       if (!items.length && !data?.default) throw new Error('jsDelivr returned no repository files.');
-      return { data, items };
+      return { data, items, version };
+    };
+
+    const directTreeItems = (items, path) => {
+      const prefix = path ? `${path}/` : '';
+      return items.filter((item) => {
+        if (!item?.path || !item.path.startsWith(prefix)) return false;
+        const rest = item.path.slice(prefix.length);
+        return rest && !rest.includes('/');
+      });
     };
 
     const renderTree = () => {
@@ -2284,6 +2501,13 @@
       $('fileCount').title = state.treeFullyLoaded ? 'Tree fully loaded' : 'Tree partially loaded';
     };
 
+    const waitForBranch = async () => {
+      if (state.branch) return { branch: state.branch };
+      if (state.repoInfoPromise) await state.repoInfoPromise;
+      if (!state.branch) throw state.repoInfoError || new Error('Unable to determine the repository default branch.');
+      return { branch: state.branch };
+    };
+
     const loadDirectoryNode = async (node, externalSignal = null) => {
       if (!node || node.type !== 'tree') return true;
       if (node.loaded) {
@@ -2291,9 +2515,7 @@
         if (details?.open) {
           const holder = details.querySelector(':scope > .folder-children');
           const needsRender = holder && (holder.children.length === 0 || holder.querySelector(':scope > .folder-placeholder'));
-          if (needsRender) {
-            holder.innerHTML = renderFolderChildren(node, node.path, node.path ? node.path.split('/').length : 0);
-          }
+          if (needsRender) holder.innerHTML = renderFolderChildren(node, node.path, node.path ? node.path.split('/').length : 0);
           treeRows = Array.from(document.querySelectorAll('.tree-item'));
           bindFolderAutoOpen();
           updateFileCount(state.tree || []);
@@ -2323,20 +2545,63 @@
       }
 
       const promise = (async () => {
+        const errors = [];
         try {
-          const treeSha = node.source?.sha;
-          if (!treeSha) throw new Error(`GitHub did not provide a tree identifier for ${node.path || 'repository root'}.`);
-          const data = await ghApi(treeApiUrl(treeSha, false), controller.signal);
+          try {
+            const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, node.source?.cdnVersion || jsDelivrVersion(), node.path);
+            if (version !== state.treeVersion) return false;
+            mergeTreeEntries(node, cdn.items, { cdnVersion: cdn.version });
+            return true;
+          } catch (error) {
+            errors.push(error);
+          }
+
+          try {
+            const data = await loadTreeFromJsDelivrData(controller.signal, node.source?.cdnVersion || jsDelivrVersion());
+            if (version !== state.treeVersion) return false;
+            const items = directTreeItems(data.items, node.path);
+            if (!items.length && node.path) throw new Error(`jsDelivr returned no visible entries for ${node.path}.`);
+            mergeTreeEntries(node, items, { cdnVersion: data.version });
+            return true;
+          } catch (error) {
+            errors.push(error);
+          }
+
+          if (node.source?.sha) {
+            const data = await ghApi(treeApiUrl(node.source.sha, false), controller.signal);
+            if (version !== state.treeVersion) return false;
+            if (!data || !Array.isArray(data.tree)) throw new Error(`GitHub returned an unexpected tree response for ${node.path || 'repository root'}.`);
+            if (data.truncated) throw new Error(`GitHub returned too many entries for ${node.path || 'repository root'}.`);
+            mergeTreeEntries(node, data.tree);
+            return true;
+          }
+
+          const branch = state.branch || (await waitForBranch()).branch;
+          const rootData = await ghApi(treeApiUrl(branch, true), controller.signal);
           if (version !== state.treeVersion) return false;
-          if (!data || !Array.isArray(data.tree)) throw new Error(`GitHub returned an unexpected tree response for ${node.path || 'repository root'}.`);
-          if (data.truncated) throw new Error(`GitHub returned too many entries for ${node.path || 'repository root'}.`);
+          if (!rootData || !Array.isArray(rootData.tree)) throw new Error('GitHub returned an unexpected tree response.');
+
+          if (!rootData.truncated) {
+            mergeRecursiveTree(rootData.tree, rootData.sha || '');
+            const refreshed = directoryNodeFor(node.path);
+            if (!refreshed) throw new Error(`Folder not found in ${state.owner}/${state.repo}.`);
+            return true;
+          }
+
+          const directoryEntry = rootData.tree.find((item) => item.type === 'tree' && item.path === node.path);
+          if (!directoryEntry?.sha) throw new Error(`GitHub did not provide a tree identifier for ${node.path}.`);
+          node.source = directoryEntry;
+          const data = await ghApi(treeApiUrl(directoryEntry.sha, false), controller.signal);
+          if (version !== state.treeVersion) return false;
+          if (!data || !Array.isArray(data.tree) || data.truncated) throw new Error(`GitHub returned too many entries for ${node.path}.`);
           mergeTreeEntries(node, data.tree);
           return true;
         } catch (error) {
           if (controller.signal.aborted || version !== state.treeVersion) return false;
-          node.loadError = error;
+          const detail = errors.length ? `${errors.map((item) => item.message).join(' · ')} · ${error.message}` : error.message;
+          node.loadError = new Error(detail);
           const holder = document.querySelector(`details[data-folder-path="${CSS.escape(node.path)}"] :scope > .folder-children`);
-          if (holder) holder.innerHTML = `<div class="folder-placeholder error">${escapeHTML(error.message)}</div>`;
+          if (holder) holder.innerHTML = `<div class="folder-placeholder error">${escapeHTML(node.loadError.message)}</div>`;
           return false;
         } finally {
           node.loading = false;
@@ -2352,10 +2617,8 @@
       if (detailsAfter && node.loaded) {
         const holder = detailsAfter.querySelector(':scope > .folder-children');
         if (holder) holder.innerHTML = renderFolderChildren(node, node.path, node.path ? node.path.split('/').length : 0);
-        if (node.loaded) {
-          const hasReadme = Object.keys(node.children).some((childName) => node.children[childName].type === 'blob' && README_RE.test(childName));
-          detailsAfter.dataset.readme = hasReadme ? '1' : '';
-        }
+        const hasReadme = Object.keys(node.children).some((childName) => node.children[childName].type === 'blob' && README_RE.test(childName));
+        detailsAfter.dataset.readme = hasReadme ? '1' : '';
       } else if (node.path === '') {
         renderTree();
       }
@@ -2678,7 +2941,7 @@
       const html = window.marked.parse(text, { breaks: false, gfm: true });
       const wrapper = document.createElement('div');
       wrapper.className = 'markdown-body';
-      wrapper.innerHTML = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] });
+      wrapper.innerHTML = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'], FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select'], FORBID_ATTR: ['style'] });
 
       const used = new Set();
       wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
@@ -3096,6 +3359,9 @@
       state.repoStars = 0;
       state.repoForks = 0;
       state.repoWatchers = 0;
+      state.repoLanguage = '';
+      state.repoPrivate = false;
+      state.repoForkParent = null;
       state.tree = null;
       state.treeIndex = new Map();
       state.treeFullyLoaded = false;
@@ -3211,8 +3477,29 @@
       state.repoStars = Number(data.stargazers_count || 0);
       state.repoForks = Number(data.forks_count || 0);
       state.repoWatchers = Number(data.subscribers_count ?? data.watchers_count ?? 0);
+      state.repoLanguage = data.language || '';
+      state.repoPrivate = Boolean(data.private);
+      state.repoForkParent = data.fork && data.parent ? {
+        fullName: data.parent.full_name || '',
+        htmlUrl: data.parent.html_url || ''
+      } : null;
       if (!state.branch) state.branch = state.defaultBranch;
       renderRepoSummary();
+      updateBranchControl();
+      updateFooter();
+      if (state.pendingInitialReadme && state.rootNode?.loaded && !state.currentFilePath && !state.currentFolderPath) {
+        state.pendingInitialReadme = false;
+        autoSelectReadme(true);
+      }
+    };
+
+    const safeHttpUrl = (value) => {
+      try {
+        const url = new URL(String(value || '').trim());
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+      } catch (_) {
+        return '';
+      }
     };
 
     const renderRepoSummary = () => {
@@ -3226,21 +3513,31 @@
       }
 
       const githubUrl = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/`;
-      const homepage = String(state.repoHomepage || '').trim();
+      const homepage = safeHttpUrl(state.repoHomepage);
       const homepageLink = homepage
         ? `<a href="${escapeHTML(homepage)}" target="_blank" rel="noopener noreferrer" title="Project homepage"><svg class="ui-icon" aria-hidden="true"><use href="#i-link"></use></svg><span>Home</span></a>`
+        : '';
+      const privacyIcon = state.repoPrivate
+        ? '<svg class="ui-icon" aria-hidden="true"><use href="#i-lock"></use></svg>'
+        : '';
+      const forkParentUrl = safeHttpUrl(state.repoForkParent?.htmlUrl);
+      const forkLine = state.repoForkParent?.fullName
+        ? `<div class="repo-summary-fork"><svg class="ui-icon" aria-hidden="true"><use href="#i-fork"></use></svg><span>forked from </span>${forkParentUrl ? `<a href="${escapeHTML(forkParentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(state.repoForkParent.fullName)}</a>` : `<span>${escapeHTML(state.repoForkParent.fullName)}</span>`}</div>`
         : '';
 
       box.innerHTML = `
         <div class="repo-summary-name">
           <svg class="ui-icon" aria-hidden="true"><use href="#i-github"></use></svg>
+          ${privacyIcon}
           <a href="${escapeHTML(githubUrl)}" target="_blank" rel="noopener noreferrer" title="${escapeHTML(`${state.owner}/${state.repo}`)}">${escapeHTML(`${state.owner}/${state.repo}`)}</a>
         </div>
+        ${forkLine}
         ${state.repoDescription ? `<p class="repo-summary-description">${escapeHTML(state.repoDescription)}</p>` : ''}
         <div class="repo-summary-meta">
           <span class="repo-summary-stat" title="Stars"><svg class="ui-icon" aria-hidden="true"><use href="#i-star"></use></svg>${state.repoStars.toLocaleString()}</span>
           <span class="repo-summary-stat" title="Forks"><svg class="ui-icon" aria-hidden="true"><use href="#i-fork"></use></svg>${state.repoForks.toLocaleString()}</span>
           <span class="repo-summary-stat" title="Watchers"><svg class="ui-icon" aria-hidden="true"><use href="#i-eye"></use></svg>${state.repoWatchers.toLocaleString()}</span>
+          ${state.repoLanguage ? `<span class="repo-summary-stat" title="Main language"><svg class="ui-icon" aria-hidden="true"><use href="#i-language"></use></svg>${escapeHTML(state.repoLanguage)}</span>` : ''}
           ${homepageLink}
         </div>`;
       box.hidden = false;
@@ -3253,82 +3550,104 @@
       state.tree = [];
       state.treeIndex = new Map();
       state.treeFullyLoaded = false;
+      state.repoInfoError = null;
+      state.repoInfoPromise = null;
 
       const controller = new AbortController();
       requests.tree = controller;
-      try {
-        setContentHeader('', '');
-        $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
-        const requestedBranch = state.branch;
-        await getRepoInfo(controller.signal);
-        if (requestedBranch) {
-          state.branch = requestedBranch;
-          state.defaultBranch = requestedBranch;
-        }
-        try {
-          const jsDelivrTree = await loadTreeFromJsDelivr(controller.signal);
-          if (controller.signal.aborted) return;
-          mergeRecursiveTree(jsDelivrTree.items, '');
-        } catch (jsDelivrError) {
-          if (controller.signal.aborted) return;
-          const treeData = await ghApi(treeApiUrl(state.branch, true), controller.signal);
-          if (controller.signal.aborted) return;
-          if (!treeData || !Array.isArray(treeData.tree)) {
-            throw new Error('GitHub returned an unexpected tree response.');
-          }
+      const requestedBranch = state.branch;
+      state.cdnVersion = requestedBranch || 'HEAD';
+      setContentHeader('', '');
+      $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
 
-          if (treeData.truncated) {
-            // GitHub caps recursive tree responses at 100,000 entries or 7 MB.
-            // Use the root tree SHA and load each subtree non-recursively as needed.
+      const metadataPromise = getRepoInfo(controller.signal)
+        .catch((error) => {
+          if (controller.signal.aborted) return null;
+          state.repoInfoError = error;
+          if (error.status === 404) renderHomeState('Repository or branch not found.');
+          return null;
+        });
+      state.repoInfoPromise = metadataPromise;
+
+      const treePromise = (async () => {
+        try {
+          try {
+            const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, state.cdnVersion, '');
+            if (controller.signal.aborted) return false;
             state.rootNode = makeRootNode();
-            state.rootNode.source = { sha: treeData.sha || '' };
-            state.rootNode.loaded = false;
+            state.rootNode.source = { cdnVersion: cdn.version };
             state.tree = [];
             state.treeIndex = new Map();
             state.treeFullyLoaded = false;
-            await loadDirectoryNode(state.rootNode, controller.signal);
-            if (!state.rootNode.loaded) {
-              throw state.rootNode.loadError || new Error('Unable to load the repository root.');
+            mergeTreeEntries(state.rootNode, cdn.items, { cdnVersion: cdn.version });
+          } catch (jsDelivrDirectoryError) {
+            if (controller.signal.aborted) return false;
+            try {
+              const jsDelivrTree = await loadTreeFromJsDelivrData(controller.signal, state.cdnVersion);
+              if (controller.signal.aborted) return false;
+              mergeRecursiveTree(jsDelivrTree.items, '');
+            } catch (jsDelivrDataError) {
+              if (controller.signal.aborted) return false;
+              const branch = state.branch || (await waitForBranch()).branch;
+              const treeData = await ghApi(treeApiUrl(branch, true), controller.signal);
+              if (controller.signal.aborted) return false;
+              if (!treeData || !Array.isArray(treeData.tree)) throw new Error('GitHub returned an unexpected tree response.');
+              if (treeData.truncated) {
+                state.rootNode = makeRootNode();
+                state.rootNode.source = { sha: treeData.sha || '', cdnVersion: state.cdnVersion };
+                state.tree = [];
+                state.treeIndex = new Map();
+                state.treeFullyLoaded = false;
+                const loaded = await loadDirectoryNode(state.rootNode, controller.signal);
+                if (!loaded || !state.rootNode.loaded) throw state.rootNode.loadError || new Error('Unable to load the repository root.');
+                $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
+              } else {
+                mergeRecursiveTree(treeData.tree, treeData.sha || '');
+              }
             }
-            $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
-          } else {
-            mergeRecursiveTree(treeData.tree, treeData.sha || '');
           }
+
+          if (controller.signal.aborted) return false;
+          renderTree();
+          updateRepoHeader();
+          updateFooter();
+          updateBranchControl();
+          cacheRepo();
+          return true;
+        } catch (error) {
+          if (controller.signal.aborted) return false;
+          if (error.status === 404) {
+            renderHomeState('Repository or branch not found.');
+            return false;
+          }
+          const treeNotice = document.createElement('div');
+          treeNotice.className = 'notice error';
+          treeNotice.textContent = error.message;
+          $('tree').replaceChildren(treeNotice);
+          showError(error.message, error.status === 403 || error.status === 429);
+          return false;
         }
-        renderTree();
-        updateRepoHeader();
-        updateFooter();
-        updateBranchControl();
-        cacheRepo();
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        if (error.status === 404) {
-          renderHomeState('Repository or branch not found.');
-          return;
-        }
-        const suffix = error.status === 403 || error.status === 429 ? '<br><br><button class="secondary-btn" data-action="open-token">Open token settings</button>' : '';
-        const localNote = state.fileAccessBlocked ? '<br><br><strong>Local file access:</strong> your browser blocked the .git/config read. The local-file workflow needs file access enabled for this browser.' : '';
-        const treeNotice = document.createElement('div');
-        treeNotice.className = 'notice error';
-        treeNotice.textContent = error.message;
-        $('tree').replaceChildren(treeNotice);
-        showError(error.message, Boolean(suffix));
-      } finally {
-        if (requests.tree === controller) requests.tree = null;
+      })();
+
+      const treeLoaded = await treePromise;
+      if (requests.tree === controller) requests.tree = null;
+      if (treeLoaded && state.pendingInitialReadme && state.branch && !state.currentFilePath && !state.currentFolderPath) {
+        state.pendingInitialReadme = false;
+        await autoSelectReadme(true);
       }
+      return treeLoaded;
     };
 
     const updateRepoHeader = () => {
       const label = state.owner && state.repo ? `${state.owner} / ${state.repo}` : CONFIG.appName;
       document.title = state.owner && state.repo ? `${state.owner} / ${state.repo} · LiteGH` : 'LiteGH';
       renderRepoSummary();
+      updateCodeMenu();
       syncRepoSearch();
     };
 
     const updateFooter = () => {
-      $('footerText').textContent = state.owner && state.repo
-        ? `LiteGH · ${state.owner}/${state.repo} · ${new Date().getFullYear()}`
-        : 'LiteGH · Lightweight GitHub repository browser';
+      $('footerText').textContent = `© ${new Date().getFullYear()} LiteGH · ` + (state.owner && state.repo ? `${state.owner}/${state.repo}` : '');
       const license = state.tree?.find((item) => item.type === 'blob' && /^(license|licence)(?:\.[^/]+)?$/i.test(item.path));
       const link = $('licenseLink');
       if (license && state.owner && state.repo) {
@@ -3339,14 +3658,57 @@
       }
     };
 
+    const cloneValues = () => {
+      const ownerRepo = `${state.owner}/${state.repo}`;
+      return {
+        https: `https://github.com/${ownerRepo}.git`,
+        ssh: `git@github.com:${ownerRepo}.git`,
+        cli: `gh repo clone ${ownerRepo}`,
+      };
+    };
+
+    const updateCodeMenu = () => {
+      if (!state.owner || !state.repo || !state.branch) {
+        $('codeControl').hidden = true;
+        closeCodeMenu();
+        return;
+      }
+      $('codeControl').hidden = false;
+      const values = cloneValues();
+      const selected = values[state.codeCloneType] || values.https;
+      $('cloneUrl').value = selected;
+      const zipUrl = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/archive/refs/heads/${encodePath(state.branch)}.zip`;
+      $('downloadZip').href = zipUrl;
+      document.querySelectorAll('.code-tab').forEach((tab) => {
+        const active = tab.dataset.clone === state.codeCloneType;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+    };
+
+    const openCodeMenu = () => {
+      updateCodeMenu();
+      $('codeMenu').hidden = false;
+      $('btnCode').setAttribute('aria-expanded', 'true');
+    };
+
+    const closeCodeMenu = () => {
+      const menu = $('codeMenu');
+      if (!menu) return;
+      menu.hidden = true;
+      $('btnCode')?.setAttribute('aria-expanded', 'false');
+    };
+
     const updateBranchControl = () => {
       if (!state.branch) {
         $('branchControl').hidden = true;
+        updateCodeMenu();
         return;
       }
       $('branchControl').hidden = false;
       $('btnBranch').textContent = `⎇ ${state.branch}`;
       $('btnBranch').title = `Switch branch · current: ${state.branch}`;
+      updateCodeMenu();
     };
 
     const openBranchMenu = async () => {
@@ -3378,6 +3740,8 @@
       closeBranchMenu();
       safeSet(localStorage, storageKey('repo'), JSON.stringify({ owner: state.owner, repo: state.repo, branch }));
       state.branch = branch;
+      state.cdnVersion = branch;
+      updateCodeMenu();
       state.tree = null;
       state.rootNode = null;
       state.treeVersion += 1;
@@ -3804,6 +4168,36 @@
       $('repoSearchInput').classList.remove('is-invalid');
     };
 
+    const copyCloneValue = async () => {
+      const input = $('cloneUrl');
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(input.value);
+        } else {
+          input.select();
+          document.execCommand('copy');
+        }
+        const button = $('btnCopyClone');
+        const original = button.innerHTML;
+        button.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#i-copy"></use></svg>';
+        button.title = 'Copied';
+        setTimeout(() => {
+          button.innerHTML = original;
+          button.title = 'Copy clone URL';
+        }, 1000);
+      } catch (_) {
+        input.focus();
+        input.select();
+      }
+    };
+
+    const handleCodeKeydown = (event) => {
+      if (event.key === 'Escape') {
+        closeCodeMenu();
+        $('btnCode').focus();
+      }
+    };
+
     const setupControls = () => {
       $('repoSearch').addEventListener('submit', (event) => {
         event.preventDefault();
@@ -3851,14 +4245,6 @@
         renderTokenPanel();
       });
       $('btnTreeTop').addEventListener('click', () => $('tree').scrollTo({ top: 0, behavior: 'smooth' }));
-      $('btnExpand').addEventListener('click', () => {
-        const details = Array.from(document.querySelectorAll('#tree details.folder-wrap'));
-        const expanding = $('btnExpand').getAttribute('aria-label') !== 'Collapse all folders';
-        details.forEach((d) => d.open = expanding);
-        $('btnExpand').classList.toggle('is-expanded', expanding);
-        $('btnExpand').title = expanding ? 'Collapse all folders' : 'Expand all folders';
-        $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
-      });
       $('treeFilter').addEventListener('input', debounce(runFilter, 100));
       $('treeFilter').addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -3895,6 +4281,7 @@
       $('fileActions').addEventListener('click', handleFileAction);
       $('branchControl').addEventListener('keydown', handleBranchKeydown);
       $('btnBranch').addEventListener('click', () => {
+        closeCodeMenu();
         if ($('branchMenu').hidden) openBranchMenu();
         else closeBranchMenu();
       });
@@ -3902,8 +4289,22 @@
         const option = event.target.closest('[data-branch]');
         if (option) switchBranch(option.dataset.branch);
       });
+      $('btnCode').addEventListener('click', () => {
+        closeBranchMenu();
+        if ($('codeMenu').hidden) openCodeMenu();
+        else closeCodeMenu();
+      });
+      $('codeControl').addEventListener('keydown', handleCodeKeydown);
+      document.querySelectorAll('.code-tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          state.codeCloneType = tab.dataset.clone || 'https';
+          updateCodeMenu();
+        });
+      });
+      $('btnCopyClone').addEventListener('click', copyCloneValue);
       document.addEventListener('click', (event) => {
         if (!event.target.closest('#branchControl')) closeBranchMenu();
+        if (!event.target.closest('#codeControl')) closeCodeMenu();
         if (!event.target.closest('#repoSearch')) closeRepoSearch();
       });
       document.addEventListener('keydown', handleGlobalKeydown);
@@ -4141,6 +4542,7 @@
       state.repo = CONFIG.repo;
       state.branch = CONFIG.branch;
       state.currentFilePath = route?.file || '';
+      state.pendingInitialReadme = !route?.file && route?.mode !== 'tree' && !route?.branch;
       if (route?.fromQuery) canonicalizeQueryRoute(route);
       updateRepoHeader();
       await fetchTree();
@@ -4150,7 +4552,10 @@
       } else if (route?.mode === 'tree') {
         await openFolderRoute(route.folder || '');
       } else {
-        await autoSelectReadme(true);
+        if (state.branch) {
+          state.pendingInitialReadme = false;
+          await autoSelectReadme(true);
+        }
       }
     };
 
