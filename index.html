@@ -392,6 +392,10 @@
     }
 
     .branch-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      min-width: 0;
       border: 1px solid var(--border);
       background: var(--surface-2);
       color: var(--text);
@@ -401,9 +405,32 @@
       line-height: 1.2;
       cursor: pointer;
       max-width: 10rem;
+      white-space: nowrap;
+    }
+
+    .branch-glyph {
+      flex: 0 0 auto;
+      font-size: 0.95em;
+      line-height: 1;
+    }
+
+    .branch-button-label {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .branch-button .branch-chevron {
+      width: 0.82rem;
+      height: 0.82rem;
+      flex: 0 0 0.82rem;
+      transition: transform var(--transition);
+    }
+
+    .branch-button[aria-expanded="true"] .branch-chevron,
+    .code-button[aria-expanded="true"] .code-chevron {
+      transform: rotate(180deg);
     }
 
     .branch-button:hover,
@@ -462,8 +489,6 @@
     }
 
     .code-button {
-      display: inline-flex;
-      align-items: center;
       gap: 0.28rem;
     }
 
@@ -474,17 +499,15 @@
       transition: transform var(--transition);
     }
 
-    .code-button[aria-expanded="true"] .code-chevron {
-      transform: rotate(180deg);
-    }
-
     .code-menu {
       position: absolute;
       top: calc(100% + 0.3rem);
       right: 0;
       z-index: 30;
-      width: min(28rem, 78vw);
-      padding: 0.6rem;
+      width: min(18rem, var(--sidebar-menu-width));
+      max-width: calc(100vw - 1rem);
+      min-width: 0;
+      padding: 0.45rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
@@ -568,6 +591,7 @@
     }
 
     .sidebar {
+      --sidebar-menu-width: calc(var(--sidebar-width) - 1.3rem);
       width: var(--sidebar-width);
       flex: 0 0 var(--sidebar-width);
       display: flex;
@@ -1501,16 +1525,29 @@
       .toolbar-btn {
         min-width: 1.9rem;
       }
+      .workspace {
+        flex-direction: column;
+      }
       .sidebar {
-        width: min(66vw, 15rem);
-        flex-basis: min(66vw, 15rem);
+        --sidebar-menu-width: calc(100vw - 1.3rem);
+        width: 100%;
+        height: min(40vh, 20rem);
+        max-height: min(40vh, 20rem);
+        flex: 0 0 min(40vh, 20rem);
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
       }
       .resizer {
+        display: none;
         width: 0;
         flex-basis: 0;
       }
       .workspace .sidebar.hidden + .resizer {
         display: none;
+      }
+      .content {
+        width: 100%;
+        min-height: 0;
       }
       .content-head {
         align-items: flex-start;
@@ -1555,8 +1592,7 @@
         font-size: 0.95rem;
       }
       .sidebar {
-        width: min(58vw, 14rem);
-        flex-basis: min(58vw, 14rem);
+        --sidebar-menu-width: calc(100vw - 1.3rem);
       }
       .icon-btn,
       .toolbar-btn {
@@ -1694,7 +1730,7 @@
         <div class="sidebar-head">
           <div class="sidebar-head-left">
             <div id="branchControl" class="branch-control" hidden>
-              <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"></button>
+              <button id="btnBranch" class="branch-button" type="button" aria-haspopup="listbox" aria-expanded="false" title="Switch branch"><span class="branch-glyph" aria-hidden="true">⎇</span><span id="branchLabel" class="branch-button-label"></span><svg class="ui-icon branch-chevron" aria-hidden="true"><use href="#i-chevron"></use></svg></button>
               <div id="branchMenu" class="branch-menu" role="listbox" aria-label="Branches" hidden></div>
             </div>
             <div id="fileCount" class="file-count">—</div>
@@ -1742,10 +1778,9 @@
             </div>
           </div>
           <footer class="app-footer">
-            <span id="footerText">LiteGH · browser-only GitHub repository viewer</span>
+            <span id="footerText">&copy; 2026 LiteGH by niu tech · not affiliated with GitHub, Inc.</span>
             <span class="footer-links">
-              <a href="https://github.com/LiteGH/LiteGH" target="_blank" rel="noopener noreferrer">Source</a> ·
-              <a id="licenseLink" href="#" target="_blank" rel="noopener noreferrer" hidden>License</a>
+              <a href="/LiteGH/LiteGH">Source code</a></a>
             </span>
           </footer>
         </div>
@@ -2372,6 +2407,16 @@
       return result;
     };
 
+    const parseJsDelivrSize = (value) => {
+      const match = String(value || '').trim().match(/^([\d,]+(?:\.\d+)?)\s*(B|bytes?|KB|MB|GB|TB)?$/i);
+      if (!match) return 0;
+      const amount = Number(match[1].replace(/,/g, ''));
+      if (!Number.isFinite(amount) || amount < 0) return 0;
+      const unit = (match[2] || 'B').toUpperCase();
+      const powers = { B: 0, BYTE: 0, BYTES: 0, KB: 1, MB: 2, GB: 3, TB: 4 };
+      return Math.round(amount * (1024 ** (powers[unit] ?? 0)));
+    };
+
     const parseJsDelivrDirectory = (html, directoryPath = '') => {
       const documentFragment = new DOMParser().parseFromString(html, 'text/html');
       const baseUrl = jsDelivrDirectoryUrl(jsDelivrVersion(), directoryPath);
@@ -2379,7 +2424,9 @@
       const items = [];
       const seen = new Set();
 
-      documentFragment.querySelectorAll('.listing a[href]').forEach((link) => {
+      documentFragment.querySelectorAll('.listing tr').forEach((row) => {
+        const link = row.querySelector('td.name a[href]');
+        if (!link) return;
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
         let url;
@@ -2402,7 +2449,7 @@
         const item = {
           type: isDirectory ? 'tree' : 'blob',
           path,
-          size: 0,
+          size: isDirectory ? 0 : parseJsDelivrSize(row.querySelector('td.size')?.textContent),
           sha: '',
           html_url: '',
           download_url: ''
@@ -3386,7 +3433,6 @@
         fragment.appendChild(homeState);
       }
       $('contentBody').replaceChildren(fragment);
-      updateFooter();
       safeRemove(localStorage, storageKey('repo'));
       history.replaceState(null, '', `${location.pathname}`);
       hashNavigated = false;
@@ -3486,7 +3532,6 @@
       if (!state.branch) state.branch = state.defaultBranch;
       renderRepoSummary();
       updateBranchControl();
-      updateFooter();
       if (state.pendingInitialReadme && state.rootNode?.loaded && !state.currentFilePath && !state.currentFolderPath) {
         state.pendingInitialReadme = false;
         autoSelectReadme(true);
@@ -3610,7 +3655,6 @@
           if (controller.signal.aborted) return false;
           renderTree();
           updateRepoHeader();
-          updateFooter();
           updateBranchControl();
           cacheRepo();
           return true;
@@ -3644,18 +3688,6 @@
       renderRepoSummary();
       updateCodeMenu();
       syncRepoSearch();
-    };
-
-    const updateFooter = () => {
-      $('footerText').textContent = `© ${new Date().getFullYear()} LiteGH · ` + (state.owner && state.repo ? `${state.owner}/${state.repo}` : '');
-      const license = state.tree?.find((item) => item.type === 'blob' && /^(license|licence)(?:\.[^/]+)?$/i.test(item.path));
-      const link = $('licenseLink');
-      if (license && state.owner && state.repo) {
-        link.href = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/blob/${encodeURIComponent(state.branch)}/${encodePath(license.path)}`;
-        link.hidden = false;
-      } else {
-        link.hidden = true;
-      }
     };
 
     const cloneValues = () => {
@@ -3706,7 +3738,7 @@
         return;
       }
       $('branchControl').hidden = false;
-      $('btnBranch').textContent = `⎇ ${state.branch}`;
+      $('branchLabel').textContent = state.branch;
       $('btnBranch').title = `Switch branch · current: ${state.branch}`;
       updateCodeMenu();
     };
