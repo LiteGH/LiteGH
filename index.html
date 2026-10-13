@@ -3599,12 +3599,17 @@
       state.repoInfoError = null;
       state.repoInfoPromise = null;
 
+      $('tree').innerHTML = '<div class="notice" role="status">Loading files…</div>';
+      treeRows = [];
+      $('fileCount').textContent = '—';
+      $('fileCount').title = 'Loading repository tree';
+
       const controller = new AbortController();
       requests.tree = controller;
       const requestedBranch = state.branch;
       state.cdnVersion = requestedBranch || 'HEAD';
       setContentHeader('', '');
-      $('contentBody').innerHTML = '<div class="notice">Loading repository files…</div>';
+      $('contentBody').innerHTML = '<div class="notice" role="status">Loading repository files…</div>';
 
       const metadataPromise = getRepoInfo(controller.signal)
         .catch((error) => {
