@@ -146,6 +146,31 @@
       flex-basis: 1.05rem;
     }
 
+    .loading-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.42rem;
+    }
+
+    .throbber {
+      display: inline-block;
+      width: 0.72rem;
+      height: 0.72rem;
+      flex: 0 0 0.72rem;
+      border: 1.5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: throbber-spin 0.75s linear infinite;
+    }
+
+    .refresh-icon.is-spinning {
+      animation: throbber-spin 0.75s linear infinite;
+    }
+
+    @keyframes throbber-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .repo-search {
       display: flex;
       position: relative;
@@ -699,7 +724,8 @@
     .repo-summary-meta {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      flex-wrap: wrap;
+      gap: 0.3rem 0.5rem;
       min-width: 0;
       font-size: 0.68rem;
       color: var(--muted);
@@ -912,19 +938,36 @@
       padding: 0.45rem 0.65rem;
       border-top: 1px solid var(--border);
       display: flex;
-      justify-content: center;
+      gap: 0.35rem;
       background: var(--surface);
     }
 
     .mini-btn {
       border: 0;
-      width: 100%;
+      min-width: 0;
+      flex: 1 1 0;
       border-radius: 0.5rem;
       padding: 0.36rem 0.5rem;
       background: transparent;
       color: var(--muted);
       cursor: pointer;
       font-size: 0.74rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      white-space: nowrap;
+    }
+
+    .mini-btn .ui-icon {
+      width: 0.82rem;
+      height: 0.82rem;
+      flex: 0 0 0.82rem;
+    }
+
+    .mini-btn:disabled {
+      cursor: wait;
+      opacity: 0.75;
     }
 
     .mini-btn:hover {
@@ -1648,6 +1691,10 @@
         scroll-behavior: auto !important;
         transition: none !important;
       }
+      .throbber,
+      .refresh-icon.is-spinning {
+        animation-duration: 1.8s;
+      }
     }
   </style>
 </head>
@@ -1680,6 +1727,8 @@
       <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 9V4h10v5M6 18H4V10h16v8h-2M7 15h10v5H7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
       <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-8 8M19 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-11A1.5 1.5 0 0 1 6.5 6H12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8.5" cy="15.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m11.5 13 6.5-6.5M15 9l2 2M17 7l2 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.6 9a7 7 0 0 1 11.7-2L20 12M4 12l2.7 5a7 7 0 0 0 11.7-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.2A7.8 7.8 0 0 1 9.8 4.5 8.4 8.4 0 1 0 19.5 14.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.7" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 10.5v5.2M12 7.3h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -1761,6 +1810,7 @@
         </div>
         <div id="tree" class="tree" tabindex="0"></div>
         <div class="sidebar-foot">
+          <button id="btnRefreshTree" class="mini-btn" type="button" title="Purge cache and refresh repository tree" aria-busy="false"><svg class="ui-icon refresh-icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span></button>
           <button id="btnTreeTop" class="mini-btn" type="button" title="Scroll file list to top">↑ Top</button>
         </div>
       </aside>
@@ -1835,6 +1885,7 @@
       repoSearchActiveIndex: -1,
       markdownImageObserver: null,
       cdnVersion: 'HEAD',
+      forceFreshTree: false,
       pendingInitialReadme: false,
       codeCloneType: 'https',
     };
@@ -2056,7 +2107,7 @@
     const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[c]);
-    const displayName = (name) => name.replace(/-/g, ' ');
+    const loadingMarkup = (label) => `<span class="loading-label"><span class="throbber" aria-hidden="true"></span><span>${escapeHTML(label)}</span></span>`;
     const homeStateTemplate = $('homeState')?.cloneNode(true);
     const extOf = (path) => {
       const name = path.split('/').pop() || '';
@@ -2462,8 +2513,11 @@
       return items;
     };
 
-    const loadTreeFromJsDelivrDirectory = async (signal, version = jsDelivrVersion(), path = '') => {
-      const response = await fetch(jsDelivrDirectoryUrl(version, path), { signal });
+    const loadTreeFromJsDelivrDirectory = async (signal, version = jsDelivrVersion(), path = '', forceFresh = false) => {
+      const response = await fetch(jsDelivrDirectoryUrl(version, path), {
+        signal,
+        ...(forceFresh ? { cache: 'no-store' } : {}),
+      });
       if (!response.ok) {
         const error = new Error(`jsDelivr directory request failed: ${response.status}`);
         error.status = response.status;
@@ -2526,14 +2580,14 @@
         const summaryClass = `tree-folder tree-indent-${Math.min(depth, 4)}${activeClass}`;
         return `<details class="folder-wrap${activeClass}" data-folder-path="${escapeHTML(fullPath)}" ${hasReadme ? 'data-readme="1"' : ''}>
           <summary class="${summaryClass}" title="${escapeHTML(fullPath)}">
-            <svg class="ui-icon tree-folder-icon" aria-hidden="true"><use href="#i-folder"></use></svg><span class="tree-name">${escapeHTML(displayName(name))}</span>
+            <svg class="ui-icon tree-folder-icon" aria-hidden="true"><use href="#i-folder"></use></svg><span class="tree-name">${escapeHTML(name)}</span>
           </summary>
           <div class="folder-children">${children}</div>
         </details>`;
       }
 
       const size = formatFileSize(node.size || 0);
-      const readme = README_RE.test(name) ? '<strong>' + escapeHTML(displayName(name)) + '</strong>' : escapeHTML(displayName(name));
+      const readme = README_RE.test(name) ? '<strong>' + escapeHTML(name) + '</strong>' : escapeHTML(name);
       const [fileIcon, fileKind] = getFileIcon(name);
       const className = `tree-item tree-indent-${Math.min(depth, 4)}`;
       return `<div class="${className}" role="button" tabindex="0" data-action="select-file" data-path="${escapeHTML(fullPath)}" title="${escapeHTML(fullPath)}\n${escapeHTML(size)}">
@@ -2589,7 +2643,7 @@
       const details = document.querySelector(`details[data-folder-path="${CSS.escape(node.path)}"]`);
       if (details) {
         const holder = details.querySelector(':scope > .folder-children');
-        if (holder) holder.innerHTML = '<div class="folder-placeholder">Loading files…</div>';
+        if (holder) holder.innerHTML = `<div class="folder-placeholder">${loadingMarkup('Loading files…')}</div>`;
       }
 
       const promise = (async () => {
@@ -3033,12 +3087,20 @@
       }
 
       const markdownImages = Array.from(wrapper.querySelectorAll('img[src]'));
+      const markdownImageSources = new WeakMap();
+      markdownImages.forEach((img) => {
+        const src = img.getAttribute('src') || '';
+        if (!/^(https?:)?\/\//i.test(src) && !src.startsWith('data:') && !src.startsWith('blob:')) {
+          markdownImageSources.set(img, src);
+          img.removeAttribute('src');
+        }
+      });
       const loadMarkdownImage = async (img) => {
         img.loading = 'lazy';
         img.decoding = 'async';
         img.referrerPolicy = 'no-referrer';
 
-        const src = img.getAttribute('src') || '';
+        const src = markdownImageSources.get(img) || img.getAttribute('src') || '';
         if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) {
           return;
         }
@@ -3240,16 +3302,15 @@
 
       parts.forEach((segment, index) => {
         const cumulative = parts.slice(0, index + 1).join('/');
-        const label = displayName(segment);
         const isLast = index === parts.length - 1;
 
         if (isLast) {
-          links.push(`<span class="crumb-file">${escapeHTML(label)}</span>`);
+          links.push(`<span class="crumb-file">${escapeHTML(segment)}</span>`);
           return;
         }
 
         const url = `${treeRoot}/${encodePath(cumulative)}/`;
-        links.push(`<a href="${escapeHTML(url)}" data-folder="${escapeHTML(cumulative)}">${escapeHTML(label)}</a>`);
+        links.push(`<a href="${escapeHTML(url)}" data-folder="${escapeHTML(cumulative)}">${escapeHTML(segment)}</a>`);
       });
 
       if (!parts.length && plainTitle) {
@@ -3334,7 +3395,7 @@
       clearBlobUrls();
       const ext = extOf(path);
       setContentHeader(path, ext);
-      $('contentBody').innerHTML = '<div class="notice">Loading…</div>';
+      $('contentBody').innerHTML = `<div class="notice">${loadingMarkup('Loading…')}</div>`;
       lastRawText = null;
 
       try {
@@ -3548,6 +3609,21 @@
       }
     };
 
+    const formatShortDate = (value) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (isNaN(date)) return '';
+      const sec = 1000, min = sec * 60, hr = min * 60, day = hr * 24, mo = day * 30;
+      const rtf = new Intl.RelativeTimeFormat(undefined, { style: 'narrow', numeric: 'auto' });
+      const diff = date.getTime() - Date.now();
+      const absDiff = Math.abs(diff);
+      if (absDiff < min) return rtf.format(Math.round(diff / sec), 'second');
+      if (absDiff < hr) return rtf.format(Math.round(diff / min), 'minute');
+      if (absDiff < day) return rtf.format(Math.round(diff / hr), 'hour');
+      if (absDiff < mo) return rtf.format(Math.round(diff / day), 'day');
+      return rtf.format(Math.round(diff / (day * 365)), 'year');
+    };
+
     const renderRepoSummary = () => {
       const box = $('repoSummary');
       if (!box || !state.owner || !state.repo) {
@@ -3570,7 +3646,10 @@
       const forkLine = state.repoForkParent?.fullName
         ? `<div class="repo-summary-fork"><svg class="ui-icon" aria-hidden="true"><use href="#i-fork"></use></svg><span>forked from </span>${forkParentUrl ? `<a href="${escapeHTML(forkParentUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(state.repoForkParent.fullName)}</a>` : `<span>${escapeHTML(state.repoForkParent.fullName)}</span>`}</div>`
         : '';
-
+      const pushedDate = formatShortDate(state.repoUpdated);
+      const pushedTitle = state.repoUpdated && Number.isFinite(new Date(state.repoUpdated).getTime())
+        ? `Last pushed ${new Date(state.repoUpdated).toLocaleString()}`
+        : 'Last pushed to GitHub';
       box.innerHTML = `
         <div class="repo-summary-name">
           <svg class="ui-icon" aria-hidden="true"><use href="#i-github"></use></svg>
@@ -3583,10 +3662,71 @@
           <span class="repo-summary-stat" title="Stars"><svg class="ui-icon" aria-hidden="true"><use href="#i-star"></use></svg>${state.repoStars.toLocaleString()}</span>
           <span class="repo-summary-stat" title="Forks"><svg class="ui-icon" aria-hidden="true"><use href="#i-fork"></use></svg>${state.repoForks.toLocaleString()}</span>
           <span class="repo-summary-stat" title="Watchers"><svg class="ui-icon" aria-hidden="true"><use href="#i-eye"></use></svg>${state.repoWatchers.toLocaleString()}</span>
+          ${pushedDate ? `<span class="repo-summary-stat" title="${escapeHTML(pushedTitle)}"><svg class="ui-icon" aria-hidden="true"><use href="#i-clock"></use></svg>${escapeHTML(pushedDate)}</span>` : ''}
           ${state.repoLanguage ? `<span class="repo-summary-stat" title="Main language"><svg class="ui-icon" aria-hidden="true"><use href="#i-language"></use></svg>${escapeHTML(state.repoLanguage)}</span>` : ''}
           ${homepageLink}
         </div>`;
       box.hidden = false;
+    };
+
+    const refreshRepositoryTree = async () => {
+      if (!state.owner || !state.repo) return;
+      const button = $('btnRefreshTree');
+      if (!button || button.disabled) return;
+
+      const filePath = state.currentFilePath;
+      const folderPath = state.currentFolderPath;
+      const requestedOwner = state.owner;
+      const requestedRepo = state.repo;
+      const requestedBranch = state.branch;
+      const version = requestedBranch || state.cdnVersion || 'HEAD';
+      const purgeUrl = `https://purge.jsdelivr.net/gh/${encodeURIComponent(requestedOwner)}/${encodeURIComponent(requestedRepo)}@${encodeURIComponent(version)}/`;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.querySelector('.refresh-icon')?.classList.add('is-spinning');
+
+      // Stop in-flight work and show loading state immediately, including while jsDelivr purges.
+      abortTreeRequest();
+      abortContentRequest();
+      setContentHeader('', '');
+      $('tree').innerHTML = `<div class="notice" role="status" aria-live="polite">${loadingMarkup('Loading files...')}</div>`;
+      treeRows = [];
+      $('fileCount').textContent = '—';
+      $('fileCount').title = 'Loading repository tree';
+      $('contentBody').innerHTML = `<div class="notice">${loadingMarkup('Loading repository files…')}</div>`;
+      clearBlobUrls();
+
+      try {
+        try {
+          const purgeResponse = await fetch(purgeUrl, { cache: 'no-store' });
+          if (!purgeResponse.ok) console.warn(`jsDelivr purge request failed: ${purgeResponse.status}`);
+        } catch (error) {
+          // Still request the tree: a purge failure should not block refreshing the UI.
+          console.warn('jsDelivr purge request failed; attempting a fresh tree request anyway.', error);
+        }
+
+        // Do not let a delayed purge from an old route cancel a repository/branch
+        // navigation that happened while the purge request was in flight.
+        if (state.owner !== requestedOwner || state.repo !== requestedRepo || (requestedBranch && state.branch !== requestedBranch)) return;
+
+        state.forceFreshTree = true;
+        const loaded = await fetchTree();
+        state.forceFreshTree = false;
+        if (!loaded) return;
+
+        if (filePath) {
+          await selectFile(filePath, '', 'none');
+        } else if (folderPath) {
+          await openFolderRoute(folderPath, 'none');
+        } else if (!state.currentFilePath && !state.currentFolderPath) {
+          await autoSelectReadme(true);
+        }
+      } finally {
+        state.forceFreshTree = false;
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+        button.querySelector('.refresh-icon')?.classList.remove('is-spinning');
+      }
     };
 
     const fetchTree = async () => {
@@ -3599,7 +3739,7 @@
       state.repoInfoError = null;
       state.repoInfoPromise = null;
 
-      $('tree').innerHTML = '<div class="notice" role="status">Loading files…</div>';
+      $('tree').innerHTML = `<div class="notice" role="status">${loadingMarkup('Loading files...')}</div>`;
       treeRows = [];
       $('fileCount').textContent = '—';
       $('fileCount').title = 'Loading repository tree';
@@ -3609,7 +3749,7 @@
       const requestedBranch = state.branch;
       state.cdnVersion = requestedBranch || 'HEAD';
       setContentHeader('', '');
-      $('contentBody').innerHTML = '<div class="notice" role="status">Loading repository files…</div>';
+      $('contentBody').innerHTML = `<div class="notice" role="status">${loadingMarkup('Loading repository files…')}</div>`;
 
       const metadataPromise = getRepoInfo(controller.signal)
         .catch((error) => {
@@ -3623,7 +3763,7 @@
       const treePromise = (async () => {
         try {
           try {
-            const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, state.cdnVersion, '');
+            const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, state.cdnVersion, '', state.forceFreshTree);
             if (controller.signal.aborted) return false;
             state.rootNode = makeRootNode();
             state.rootNode.source = { cdnVersion: cdn.version };
@@ -3753,7 +3893,7 @@
       const menu = $('branchMenu');
       menu.hidden = false;
       $('btnBranch').setAttribute('aria-expanded', 'true');
-      menu.innerHTML = '<div class="notice">Loading branches…</div>';
+      menu.innerHTML = `<div class="notice" role="status">${loadingMarkup('Loading branches…')}</div>`;
       try {
         if (!branchList) {
           const url = `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/branches?per_page=100`;
@@ -3761,7 +3901,7 @@
         }
         menu.innerHTML = branchList.map((branch) => `<button class="branch-option${branch.name === state.branch ? ' is-current' : ''}" type="button" role="option" data-branch="${escapeHTML(branch.name)}">${branch.name === state.branch ? '✓ ' : ''}${escapeHTML(branch.name)}</button>`).join('');
       } catch (error) {
-        menu.innerHTML = `<div class="notice error">${escapeHTML(error.message)}</div>`;
+        menu.innerHTML = `<div class="notice error" role="status">${escapeHTML(error.message)}</div>`;
       }
     };
 
@@ -4283,6 +4423,7 @@
         renderTokenPanel();
       });
       $('btnTreeTop').addEventListener('click', () => $('tree').scrollTo({ top: 0, behavior: 'smooth' }));
+      $('btnRefreshTree').addEventListener('click', refreshRepositoryTree);
       $('treeFilter').addEventListener('input', debounce(runFilter, 100));
       $('treeFilter').addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
