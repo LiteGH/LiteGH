@@ -1866,6 +1866,8 @@
       repoForks: 0,
       repoWatchers: 0,
       repoLanguage: '',
+      repoLicense: '',
+      repoArchived: false,
       repoPrivate: false,
       repoForkParent: null,
       tree: null,
@@ -2202,8 +2204,6 @@
       const suffix = path ? `/${encodePath(path)}` : '';
       return `https://cdn.jsdelivr.net/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}${suffix}/`;
     };
-    const jsDelivrDataUrl = (version = jsDelivrVersion()) =>
-      `https://data.jsdelivr.com/v1/packages/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}?structure=tree`;
     const contentsApiUrl = (path) => {
       const suffix = path ? `/${encodePath(path)}` : '';
       return `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/contents${suffix}?ref=${encodeURIComponent(state.branch)}`;
@@ -2412,53 +2412,6 @@
     const treeApiUrl = (treeSha = state.branch, recursive = false) =>
       `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/git/trees/${encodeURIComponent(treeSha)}${recursive ? '?recursive=1' : ''}`;
 
-    const flattenJsDelivrTree = (nodes, parentPath = '') => {
-      if (!Array.isArray(nodes)) return [];
-      const result = [];
-      const stack = [{ nodes, parentPath }];
-
-      while (stack.length) {
-        const frame = stack.pop();
-        for (let index = frame.nodes.length - 1; index >= 0; index -= 1) {
-          const node = frame.nodes[index];
-          if (!node || typeof node !== 'object') continue;
-          const nodeName = String(node.name ?? '').replace(/^\/+|\/+$/g, '');
-          const nodePath = node.path || (frame.parentPath && nodeName ? `${frame.parentPath}/${nodeName}` : nodeName);
-          if (!nodePath) continue;
-
-          const children = Array.isArray(node.files)
-            ? node.files
-            : Array.isArray(node.children)
-              ? node.children
-              : null;
-          const isTree = Boolean(children) || ['directory', 'dir', 'tree'].includes(String(node.type || '').toLowerCase());
-
-          if (isTree) {
-            result.push({
-              type: 'tree',
-              path: nodePath,
-              size: 0,
-              sha: node.hash || node.sha || '',
-              html_url: '',
-              download_url: ''
-            });
-            if (children?.length) stack.push({ nodes: children, parentPath: nodePath });
-          } else {
-            result.push({
-              type: 'blob',
-              path: nodePath,
-              size: Number(node.size || 0),
-              sha: node.hash || node.sha || '',
-              html_url: '',
-              download_url: ''
-            });
-          }
-        }
-      }
-
-      return result;
-    };
-
     const parseJsDelivrSize = (value) => {
       const match = String(value || '').trim().match(/^([\d,]+(?:\.\d+)?)\s*(B|bytes?|KB|MB|GB|TB)?$/i);
       if (!match) return 0;
@@ -2514,43 +2467,40 @@
     };
 
     const loadTreeFromJsDelivrDirectory = async (signal, version = jsDelivrVersion(), path = '', forceFresh = false) => {
-      const response = await fetch(jsDelivrDirectoryUrl(version, path), {
-        signal,
-        ...(forceFresh ? { cache: 'no-store' } : {}),
-      });
-      if (!response.ok) {
-        const error = new Error(`jsDelivr directory request failed: ${response.status}`);
-        error.status = response.status;
+      const requestController = new AbortController();
+      let timedOut = false;
+      const abortFromParent = () => requestController.abort();
+      if (signal?.aborted) requestController.abort();
+      else signal?.addEventListener('abort', abortFromParent, { once: true });
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        requestController.abort();
+      }, 10000);
+
+      try {
+        const response = await fetch(jsDelivrDirectoryUrl(version, path), {
+          signal: requestController.signal,
+          ...(forceFresh ? { cache: 'no-store' } : {}),
+        });
+        if (!response.ok) {
+          const error = new Error(`jsDelivr directory request failed: ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
+        const html = await response.text();
+        return { version, path, items: parseJsDelivrDirectory(html, path) };
+      } catch (error) {
+        if (timedOut && !signal?.aborted) {
+          const timeoutError = new Error('jsDelivr directory request timed out');
+          timeoutError.name = 'TimeoutError';
+          throw timeoutError;
+        }
         throw error;
+      } finally {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', abortFromParent);
       }
-      const html = await response.text();
-      return { version, path, items: parseJsDelivrDirectory(html, path) };
     };
-
-    const loadTreeFromJsDelivrData = async (signal, version = jsDelivrVersion()) => {
-      const response = await fetch(jsDelivrDataUrl(version), { signal });
-      if (!response.ok) {
-        const error = new Error(`jsDelivr tree request failed: ${response.status}`);
-        error.status = response.status;
-        throw error;
-      }
-      const data = await response.json();
-      const nodes = Array.isArray(data?.files) ? data.files : Array.isArray(data) ? data : [];
-      const items = flattenJsDelivrTree(nodes);
-      if (!items.length && nodes.length) throw new Error('jsDelivr returned an empty or unsupported tree format.');
-      if (!items.length && !data?.default) throw new Error('jsDelivr returned no repository files.');
-      return { data, items, version };
-    };
-
-    const directTreeItems = (items, path) => {
-      const prefix = path ? `${path}/` : '';
-      return items.filter((item) => {
-        if (!item?.path || !item.path.startsWith(prefix)) return false;
-        const rest = item.path.slice(prefix.length);
-        return rest && !rest.includes('/');
-      });
-    };
-
     const renderTree = () => {
       const root = state.rootNode;
       const html = root
@@ -2649,26 +2599,16 @@
       const promise = (async () => {
         const errors = [];
         try {
-          try {
-            const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, node.source?.cdnVersion || jsDelivrVersion(), node.path);
-            if (version !== state.treeVersion) return false;
-            mergeTreeEntries(node, cdn.items, { cdnVersion: cdn.version });
-            return true;
-          } catch (error) {
-            errors.push(error);
+          if (!node.source?.skipCdn) {
+            try {
+              const cdn = await loadTreeFromJsDelivrDirectory(controller.signal, node.source?.cdnVersion || jsDelivrVersion(), node.path);
+              if (version !== state.treeVersion) return false;
+              mergeTreeEntries(node, cdn.items, { cdnVersion: cdn.version });
+              return true;
+            } catch (error) {
+              errors.push(error);
+            }
           }
-
-          try {
-            const data = await loadTreeFromJsDelivrData(controller.signal, node.source?.cdnVersion || jsDelivrVersion());
-            if (version !== state.treeVersion) return false;
-            const items = directTreeItems(data.items, node.path);
-            if (!items.length && node.path) throw new Error(`jsDelivr returned no visible entries for ${node.path}.`);
-            mergeTreeEntries(node, items, { cdnVersion: data.version });
-            return true;
-          } catch (error) {
-            errors.push(error);
-          }
-
           if (node.source?.sha) {
             const data = await ghApi(treeApiUrl(node.source.sha, false), controller.signal);
             if (version !== state.treeVersion) return false;
@@ -3469,6 +3409,8 @@
       state.repoForks = 0;
       state.repoWatchers = 0;
       state.repoLanguage = '';
+      state.repoLicense = '';
+      state.repoArchived = false;
       state.repoPrivate = false;
       state.repoForkParent = null;
       state.tree = null;
@@ -3586,6 +3528,8 @@
       state.repoForks = Number(data.forks_count || 0);
       state.repoWatchers = Number(data.subscribers_count ?? data.watchers_count ?? 0);
       state.repoLanguage = data.language || '';
+      state.repoLicense = data.license?.spdx_id || '';
+      state.repoArchived = Boolean(data.archived);
       state.repoPrivate = Boolean(data.private);
       state.repoForkParent = data.fork && data.parent ? {
         fullName: data.parent.full_name || '',
@@ -3664,6 +3608,8 @@
           <span class="repo-summary-stat" title="Watchers"><svg class="ui-icon" aria-hidden="true"><use href="#i-eye"></use></svg>${state.repoWatchers.toLocaleString()}</span>
           ${pushedDate ? `<span class="repo-summary-stat" title="${escapeHTML(pushedTitle)}"><svg class="ui-icon" aria-hidden="true"><use href="#i-clock"></use></svg>${escapeHTML(pushedDate)}</span>` : ''}
           ${state.repoLanguage ? `<span class="repo-summary-stat" title="Main language"><svg class="ui-icon" aria-hidden="true"><use href="#i-language"></use></svg>${escapeHTML(state.repoLanguage)}</span>` : ''}
+          ${state.repoLicense ? `<span class="repo-summary-stat" title="License"><svg class="ui-icon" aria-hidden="true"><use href="#i-file"></use></svg>${escapeHTML(state.repoLicense)}</span>` : ''}
+          ${state.repoArchived ? `<span class="repo-summary-stat" title="This repository is archived and read-only"><svg class="ui-icon" aria-hidden="true"><use href="#i-archive"></use></svg>Archived</span>` : ''}
           ${homepageLink}
         </div>`;
       box.hidden = false;
@@ -3773,28 +3719,21 @@
             mergeTreeEntries(state.rootNode, cdn.items, { cdnVersion: cdn.version });
           } catch (jsDelivrDirectoryError) {
             if (controller.signal.aborted) return false;
-            try {
-              const jsDelivrTree = await loadTreeFromJsDelivrData(controller.signal, state.cdnVersion);
-              if (controller.signal.aborted) return false;
-              mergeRecursiveTree(jsDelivrTree.items, '');
-            } catch (jsDelivrDataError) {
-              if (controller.signal.aborted) return false;
-              const branch = state.branch || (await waitForBranch()).branch;
-              const treeData = await ghApi(treeApiUrl(branch, true), controller.signal);
-              if (controller.signal.aborted) return false;
-              if (!treeData || !Array.isArray(treeData.tree)) throw new Error('GitHub returned an unexpected tree response.');
-              if (treeData.truncated) {
-                state.rootNode = makeRootNode();
-                state.rootNode.source = { sha: treeData.sha || '', cdnVersion: state.cdnVersion };
-                state.tree = [];
-                state.treeIndex = new Map();
-                state.treeFullyLoaded = false;
-                const loaded = await loadDirectoryNode(state.rootNode, controller.signal);
-                if (!loaded || !state.rootNode.loaded) throw state.rootNode.loadError || new Error('Unable to load the repository root.');
-                $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
-              } else {
-                mergeRecursiveTree(treeData.tree, treeData.sha || '');
-              }
+            const branch = state.branch || (await waitForBranch()).branch;
+            const treeData = await ghApi(treeApiUrl(branch, true), controller.signal);
+            if (controller.signal.aborted) return false;
+            if (!treeData || !Array.isArray(treeData.tree)) throw new Error('GitHub returned an unexpected tree response.');
+            if (treeData.truncated) {
+              state.rootNode = makeRootNode();
+              state.rootNode.source = { sha: treeData.sha || '', cdnVersion: state.cdnVersion, skipCdn: true };
+              state.tree = [];
+              state.treeIndex = new Map();
+              state.treeFullyLoaded = false;
+              const loaded = await loadDirectoryNode(state.rootNode, controller.signal);
+              if (!loaded || !state.rootNode.loaded) throw state.rootNode.loadError || new Error('Unable to load the repository root.');
+              $('contentBody').innerHTML = '<div class="notice">Repository tree is larger than GitHub’s recursive response limit; folders load on demand.</div>';
+            } else {
+              mergeRecursiveTree(treeData.tree, treeData.sha || '');
             }
           }
 
@@ -4714,6 +4653,8 @@
       if (previousRepo !== nextRepo) {
         branchList = null;
         state.repoUpdated = '';
+        state.repoLicense = '';
+        state.repoArchived = false;
         clearFileMemoryCache();
         clearBlobUrls();
       }
