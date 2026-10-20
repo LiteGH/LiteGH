@@ -13,8 +13,8 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="preconnect" href="https://api.github.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="preconnect" href="https://raw.githubusercontent.com">
-  <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices and AI agents.">
   <title>LiteGH</title>
   <style>
     :root {
@@ -1408,6 +1408,160 @@
       margin: 1.2rem 0;
     }
 
+    .history-view {
+      width: min(64rem, 100%);
+      margin: 0 auto 2rem;
+    }
+
+    .history-summary {
+      margin: 0 0 0.85rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .commit-list {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    .commit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      min-width: 0;
+    }
+
+    .commit-item + .commit-item {
+      border-top: 1px solid var(--border);
+    }
+
+    .commit-icon {
+      width: 1.1rem;
+      height: 1.1rem;
+      flex: 0 0 1.1rem;
+      margin-top: 0.1rem;
+      color: var(--muted);
+    }
+
+    .commit-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .commit-message {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.86rem;
+      font-weight: 650;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .commit-body {
+      margin: 0.28rem 0 0;
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .commit-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.55rem;
+      margin-top: 0.42rem;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .commit-meta a,
+    .commit-sha {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .commit-meta a:hover,
+    .commit-sha:hover {
+      color: var(--accent);
+    }
+
+    .commit-sha {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+    }
+
+    .commit-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+      gap: 0.35rem;
+    }
+
+    .commit-browse {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .commit-browse:hover {
+      color: var(--accent);
+    }
+
+    .history-more-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 0.8rem 0 0;
+    }
+
+    .history-error-actions {
+      margin-top: 0.65rem;
+    }
+
+    .history-end {
+      text-align: center;
+      margin-top: 0.8rem;
+    }
+
+    .history-more {
+      min-width: 10rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+
+    @media (max-width: 560px) {
+      .commit-item {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.75rem;
+      }
+      .commit-main {
+        flex: 1 1 calc(100% - 1.7rem);
+      }
+      .commit-actions {
+        flex: 0 0 calc(100% - 1.6rem);
+        margin-left: 1.6rem;
+        justify-content: flex-start;
+      }
+      .commit-browse {
+        padding: 0.42rem 0.5rem;
+        font-size: 0.72rem;
+      }
+    }
+
     .token-row {
       display: flex;
       align-items: center;
@@ -1732,6 +1886,7 @@
       <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8.5" cy="15.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m11.5 13 6.5-6.5M15 9l2 2M17 7l2 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
       <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.6 9a7 7 0 0 1 11.7-2L20 12M4 12l2.7 5a7 7 0 0 0 11.7-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M4.5 8.5A8.5 8.5 0 1 1 4 14M4.5 4.5v4h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7.5v5l3 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4M18.7 18.7l-1.4-1.4M6.7 6.7 5.3 5.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.2A7.8 7.8 0 0 1 9.8 4.5 8.4 8.4 0 1 0 19.5 14.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.7" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 10.5v5.2M12 7.3h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -1759,7 +1914,7 @@
         <div class="repo-search-inner">
           <svg class="ui-icon" aria-hidden="true"><use href="#i-search"></use></svg>
           <label class="sr-only" for="repoSearchInput">Open GitHub repository</label>
-          <input id="repoSearchInput" name="repo" type="search" placeholder="Search GitHub repositories · Enter to search" spellcheck="false" autocapitalize="off" autocomplete="off" aria-controls="repoSearchResults" aria-expanded="false">
+          <input id="repoSearchInput" name="repo" type="search" role="combobox" placeholder="Search GitHub repositories · Enter to search" spellcheck="false" autocapitalize="off" autocomplete="off" aria-controls="repoSearchResults" aria-expanded="false" aria-haspopup="listbox">
           <div id="repoSearchResults" class="repo-search-results" role="listbox" hidden></div>
         </div>
       </form>
@@ -1814,6 +1969,7 @@
         <div id="tree" class="tree" tabindex="0"></div>
         <div class="sidebar-foot">
           <button id="btnRefreshTree" class="mini-btn" type="button" title="Purge cache and refresh repository tree" aria-busy="false"><svg class="ui-icon refresh-icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>Refresh</span></button>
+          <button id="btnHistory" class="mini-btn" type="button" title="Load commit history" aria-pressed="false" hidden><svg class="ui-icon" aria-hidden="true"><use href="#i-history"></use></svg><span>History</span></button>
           <button id="btnTreeTop" class="mini-btn" type="button" title="Scroll file list to top">↑ Top</button>
         </div>
       </aside>
@@ -1893,6 +2049,8 @@
       forceFreshTree: false,
       pendingInitialReadme: false,
       codeCloneType: 'https',
+      historyCache: new Map(),
+      historyRequests: new Map(),
     };
 
     const THIRD_PARTY = {
@@ -2118,6 +2276,7 @@
       const name = path.split('/').pop() || '';
       return name.includes('.') ? name.split('.').pop().toLowerCase() : '';
     };
+    const isCommitReference = (ref) => /^[a-f0-9]{7,40}$/i.test(String(ref || ''));
     const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');
     const encodeHash = (path) => encodePath(path);
     const formatFileSize = (bytes = 0) => {
@@ -2553,11 +2712,10 @@
       }
 
       const size = formatFileSize(node.size || 0);
-      const readme = README_RE.test(name) ? '<strong>' + escapeHTML(name) + '</strong>' : escapeHTML(name);
       const [fileIcon, fileKind] = getFileIcon(name);
       const className = `tree-item tree-indent-${Math.min(depth, 4)}`;
       return `<div class="${className}" role="button" tabindex="0" data-action="select-file" data-path="${escapeHTML(fullPath)}" title="${escapeHTML(fullPath)}\n${escapeHTML(size)}">
-        <span class="tree-item-main"><svg class="ui-icon tree-icon file-kind ${fileKind}" aria-hidden="true"><use href="#${fileIcon}"></use></svg><span class="tree-name">${readme}</span></span>
+        <span class="tree-item-main"><svg class="ui-icon tree-icon file-kind ${fileKind}" aria-hidden="true"><use href="#${fileIcon}"></use></svg><span class="tree-name">${escapeHTML(name)}</span></span>
         <span class="tree-size">${escapeHTML(size)}</span>
       </div>`;
     };
@@ -3571,6 +3729,7 @@
       if (!value) return '';
       const date = new Date(value);
       if (isNaN(date)) return '';
+	  
       const sec = 1000, min = sec * 60, hr = min * 60, day = hr * 24, mo = day * 30;
       const rtf = new Intl.RelativeTimeFormat(undefined, { style: 'narrow', numeric: 'auto' });
       const diff = date.getTime() - Date.now();
@@ -3786,6 +3945,8 @@
       document.title = state.owner && state.repo ? `${state.owner} / ${state.repo} · LiteGH` : 'LiteGH';
       renderRepoSummary();
       updateCodeMenu();
+      $('btnHistory').hidden = !(state.owner && state.repo);
+      updateTopButtonState();
       syncRepoSearch();
     };
 
@@ -3808,7 +3969,10 @@
       const values = cloneValues();
       const selected = values[state.codeCloneType] || values.https;
       $('cloneUrl').value = selected;
-      const zipUrl = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/archive/refs/heads/${encodePath(state.branch)}.zip`;
+      const archivePath = isCommitReference(state.branch)
+        ? encodeURIComponent(state.branch)
+        : `refs/heads/${encodePath(state.branch)}`;
+      const zipUrl = `https://github.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/archive/${archivePath}.zip`;
       $('downloadZip').href = zipUrl;
       document.querySelectorAll('.code-tab').forEach((tab) => {
         const active = tab.dataset.clone === state.codeCloneType;
@@ -3837,8 +4001,11 @@
         return;
       }
       $('branchControl').hidden = false;
-      $('branchLabel').textContent = state.branch;
-      $('btnBranch').title = `Switch branch · current: ${state.branch}`;
+      const viewingCommit = isCommitReference(state.branch);
+      $('branchLabel').textContent = viewingCommit ? `Commit ${state.branch.slice(0, 7)}` : state.branch;
+      $('btnBranch').title = viewingCommit
+        ? `Viewing commit ${state.branch}; click to switch branch`
+        : `Switch branch · current: ${state.branch}`;
       updateCodeMenu();
     };
 
@@ -3878,6 +4045,9 @@
       state.treeVersion += 1;
       state.currentFilePath = '';
       state.currentFolderPath = '';
+      state.activePanel = null;
+      state.panelReturnPath = '';
+      updateTopButtonState();
       branchList = null;
       clearFileMemoryCache();
       clearBlobUrls();
@@ -3911,8 +4081,9 @@
       updateActiveRow('');
       setContentHeader('', '', '');
       const notice = document.createElement('div');
-      notice.className = 'notice error';
+      notice.className = 'notice';
       notice.setAttribute('role', 'status');
+      const refDescription = isCommitReference(state.branch) ? `commit ${state.branch.slice(0, 7)}` : `branch ${state.branch}`;
       notice.textContent = `Choose a file from the tree to view it.`;
       $('contentBody').replaceChildren(notice);
     };
@@ -3931,6 +4102,150 @@
       const largest = [...files].sort((a, b) => (b.size || 0) - (a.size || 0)).slice(0, 5);
       const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
       return { fileCount: files.length, folderCount: folders.length, totalSize, topTypes, largest };
+    };
+
+    const historyKeyForCurrentRef = () => {
+      const owner = state.owner;
+      const repo = state.repo;
+      const ref = state.branch || state.defaultBranch;
+      return { key: `${owner}/${repo}@${ref}`, owner, repo, ref };
+    };
+
+    const renderHistoryView = (key) => {
+      if (state.activePanel !== 'history' || historyKeyForCurrentRef().key !== key) return;
+      const record = state.historyCache.get(key);
+      if (!record) return;
+      const nextPage = record.page + 1;
+      const requestKey = `${key}:${nextPage}`;
+      const loading = state.historyRequests.has(requestKey);
+      const refKind = isCommitReference(record.ref) ? 'commit' : 'branch';
+      const refLabel = isCommitReference(record.ref) ? record.ref.slice(0, 7) : record.ref;
+      let content = `<section class="history-view" aria-label="Commit history">
+        <p class="history-summary">Showing commits for <strong>${escapeHTML(record.owner)}/${escapeHTML(record.repo)}</strong> on ${escapeHTML(refKind)} <code>${escapeHTML(refLabel || 'default')}</code>. History is fetched from GitHub only when opened.</p>`;
+
+      if (record.items.length) {
+        content += '<div class="commit-list">';
+        content += record.items.map((item) => {
+          const sha = String(item.sha || '');
+          const message = String(item.commit?.message || '(no commit message)');
+          const parts = message.split(/\r?\n/);
+          const title = parts.shift() || '(no commit message)';
+          const body = parts.join('\n').trim();
+          const authorName = item.author?.login || item.commit?.author?.name || item.commit?.committer?.name || 'Unknown author';
+          const authorUrl = safeHttpUrl(item.author?.html_url || '');
+          const authorMarkup = authorUrl
+            ? `<a href="${escapeHTML(authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(authorName)}</a>`
+            : `<span>${escapeHTML(authorName)}</span>`;
+          const dateValue = item.commit?.author?.date || item.commit?.committer?.date || '';
+          const dateLabel = formatShortDate(dateValue) || 'Unknown date';
+          const dateTitle = dateValue && Number.isFinite(new Date(dateValue).getTime()) ? new Date(dateValue).toLocaleString() : '';
+          const commitUrl = `https://github.com/${encodeURIComponent(record.owner)}/${encodeURIComponent(record.repo)}/commit/${encodeURIComponent(sha)}`;
+          const treeUrl = buildPublicRoute(record.owner, record.repo, sha);
+          return `<article class="commit-item">
+            <svg class="commit-icon" aria-hidden="true"><use href="#i-history"></use></svg>
+            <div class="commit-main">
+              <p class="commit-message" title="${escapeHTML(message)}">${escapeHTML(title)}</p>
+              ${body ? `<p class="commit-body">${escapeHTML(body)}</p>` : ''}
+              <div class="commit-meta">${authorMarkup}<time${dateValue ? ` datetime="${escapeHTML(dateValue)}"` : ''}${dateTitle ? ` title="${escapeHTML(dateTitle)}"` : ''}>${escapeHTML(dateLabel)}</time><a class="commit-sha" href="${escapeHTML(commitUrl)}" target="_blank" rel="noopener noreferrer" title="View commit on GitHub">${escapeHTML(sha.slice(0, 7))}</a></div>
+            </div>
+            <div class="commit-actions"><a class="secondary-btn commit-browse" href="${escapeHTML(treeUrl)}" data-action="history-tree" data-sha="${escapeHTML(sha)}" title="Browse this commit in LiteGH"><svg class="ui-icon" aria-hidden="true"><use href="#i-folder"></use></svg><span>Browse tree</span></a></div>
+          </article>`;
+        }).join('');
+        content += '</div>';
+      } else if (loading) {
+        content += `<div class="notice" role="status">${loadingMarkup('Loading commit history…')}</div>`;
+      } else if (record.error) {
+        content += `<div class="notice error" role="alert">${escapeHTML(record.error)}<div class="history-error-actions"><button class="secondary-btn" type="button" data-action="history-retry">Retry</button></div></div>`;
+      } else {
+        content += '<div class="notice">No commits were returned for this reference.</div>';
+      }
+
+      if (record.error && record.items.length) {
+        content += `<div class="notice error" role="alert">${escapeHTML(record.error)} <button class="secondary-btn" type="button" data-action="history-retry">Retry</button></div>`;
+      } else if (record.items.length && record.hasMore) {
+        content += `<div class="history-more-wrap"><button class="secondary-btn history-more" type="button" data-action="history-more" ${loading ? 'disabled' : ''}>${loading ? loadingMarkup('Loading commits…') : 'Load more commits'}</button></div>`;
+      } else if (record.items.length && !record.hasMore) {
+        content += `<p class="history-summary history-end">Showing ${record.items.length} commit${record.items.length === 1 ? '' : 's'}.</p>`;
+      }
+      content += '</section>';
+      $('contentBody').innerHTML = content;
+    };
+
+    const loadCommitHistoryPage = async (key, page) => {
+      const requestKey = `${key}:${page}`;
+      if (state.historyRequests.has(requestKey)) return state.historyRequests.get(requestKey);
+      const record = state.historyCache.get(key);
+      if (!record) return;
+      record.error = '';
+      record.errorPage = 0;
+      const request = (async () => {
+        try {
+          const url = `https://api.github.com/repos/${encodeURIComponent(record.owner)}/${encodeURIComponent(record.repo)}/commits?sha=${encodeURIComponent(record.ref)}&per_page=20&page=${page}`;
+          const commits = await ghApi(url);
+          if (!Array.isArray(commits)) throw new Error('GitHub returned an unexpected commit history response.');
+          const existing = new Map((record.items || []).map((item) => [item.sha, item]));
+          commits.forEach((item) => { if (item?.sha) existing.set(item.sha, item); });
+          record.items = Array.from(existing.values());
+          record.page = page;
+          record.hasMore = commits.length === 20;
+          record.error = '';
+          record.errorPage = 0;
+        } catch (error) {
+          record.error = error.message || 'Unable to load commit history.';
+          record.errorPage = page;
+        } finally {
+          state.historyRequests.delete(requestKey);
+          if (state.activePanel === 'history' && historyKeyForCurrentRef().key === key) renderHistoryView(key);
+        }
+      })();
+      state.historyRequests.set(requestKey, request);
+      renderHistoryView(key);
+      return request;
+    };
+
+    const openHistoryPanel = async (toggleState = true) => {
+      if (!state.owner || !state.repo) return;
+      if (!state.branch && state.repoInfoPromise) await state.repoInfoPromise;
+      if (!state.branch) return;
+      if (toggleState && state.activePanel === 'history') {
+        returnToFile();
+        return;
+      }
+      if (state.activePanel !== 'history') state.panelReturnPath = state.currentFilePath || state.panelReturnPath;
+      state.activePanel = 'history';
+      abortContentRequest();
+      setContentHeader('', '', 'Commit history');
+      updateTopButtonState();
+      const ref = historyKeyForCurrentRef();
+      let record = state.historyCache.get(ref.key);
+      if (!record) {
+        record = { ...ref, items: [], page: 0, hasMore: true, error: '', errorPage: 0 };
+        state.historyCache.set(ref.key, record);
+      }
+      renderHistoryView(ref.key);
+      if (record.page === 0 && !record.error) await loadCommitHistoryPage(ref.key, 1);
+    };
+
+    const browseTreeAtCommit = async (sha) => {
+      if (!/^[a-f0-9]{40}$/i.test(String(sha || ''))) return;
+      state.branch = sha;
+      state.cdnVersion = sha;
+      state.currentFilePath = '';
+      state.currentFolderPath = '';
+      state.activePanel = null;
+      state.panelReturnPath = '';
+      state.pendingInitialReadme = false;
+      clearFileMemoryCache();
+      clearBlobUrls();
+      updateTopButtonState();
+      closeBranchMenu();
+      closeCodeMenu();
+      safeSet(localStorage, storageKey('repo'), JSON.stringify({ owner: state.owner, repo: state.repo, branch: sha }));
+      navigateToAppRoute(state.owner, state.repo, sha, '', false);
+      hashNavigated = false;
+      updateBranchControl();
+      const loaded = await fetchTree();
+      if (loaded) await autoSelectReadme();
     };
 
     const renderAboutPanel = async (toggleState = true) => {
@@ -4043,6 +4358,8 @@
       $('btnAbout').setAttribute('aria-pressed', String(state.activePanel === 'about'));
       $('btnToken').classList.toggle('active', state.activePanel === 'token');
       $('btnToken').setAttribute('aria-pressed', String(state.activePanel === 'token'));
+      $('btnHistory')?.classList.toggle('active', state.activePanel === 'history');
+      $('btnHistory')?.setAttribute('aria-pressed', String(state.activePanel === 'history'));
     };
 
     const resetAllData = () => {
@@ -4294,6 +4611,10 @@
       CONFIG.branch = '';
       branchList = null;
       state.currentFilePath = '';
+      state.currentFolderPath = '';
+      state.activePanel = null;
+      state.panelReturnPath = '';
+      updateTopButtonState();
       state.tree = null;
       state.rootNode = null;
       state.treeFullyLoaded = false;
@@ -4387,6 +4708,7 @@
       });
       $('btnTreeTop').addEventListener('click', () => $('tree').scrollTo({ top: 0, behavior: 'smooth' }));
       $('btnRefreshTree').addEventListener('click', refreshRepositoryTree);
+      $('btnHistory').addEventListener('click', () => openHistoryPanel(true));
       $('treeFilter').addEventListener('input', debounce(runFilter, 100));
       $('treeFilter').addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -4578,12 +4900,8 @@
       const ext = extOf(path);
       const signal = new AbortController().signal;
       const local = localUrlFor(path);
-      if (!download && local && !getToken() && ['html', 'htm'].includes(ext)) {
+      if (!download && local && !getToken() && TAB_VIEWABLE_EXTS.includes(ext) && !['svg'].includes(ext)) {
         window.open(local, '_blank', 'noopener');
-        return;
-      }
-      if (!download && !getToken() && TAB_VIEWABLE_EXTS.includes(ext) && !['html', 'htm', 'svg'].includes(ext)) {
-        window.open(local || rawUrl(path), '_blank', 'noopener');
         return;
       }
       try {
@@ -4665,6 +4983,9 @@
     const bootRepo = async () => {
       await detectLocalMode();
       const route = await detectRepo();
+      state.activePanel = null;
+      state.panelReturnPath = '';
+      updateTopButtonState();
       if (route?.invalid) {
         renderHomeState('Invalid repository URL. Enter owner/repo in the top search bar, or use a GitHub-style repository URL.');
         return;
