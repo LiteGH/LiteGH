@@ -2,7 +2,7 @@
 
 # [LiteGH](https://litegh.com)
 
-A minimal, lightweight GitHub repository browser for older devices in a single HTML file.
+A minimal, lightweight GitHub repository browser for older devices and AI agents in a single HTML file.
 
 ## Usage
 
