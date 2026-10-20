@@ -11,6 +11,9 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://api.github.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://raw.githubusercontent.com">
   <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices.">
   <title>LiteGH</title>
   <style>
@@ -2200,6 +2203,8 @@
     const rawUrl = (path) =>
       `https://raw.githubusercontent.com/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/${encodeURIComponent(state.branch)}/${encodePath(path)}`;
     const jsDelivrVersion = (version = state.cdnVersion || state.branch || 'HEAD') => version || 'HEAD';
+    const jsDelivrAssetUrl = (path, version = jsDelivrVersion()) =>
+      `https://cdn.jsdelivr.net/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}/${encodePath(path)}`;
     const jsDelivrDirectoryUrl = (version = jsDelivrVersion(), path = '') => {
       const suffix = path ? `/${encodePath(path)}` : '';
       return `https://cdn.jsdelivr.net/gh/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}@${encodeURIComponent(version)}${suffix}/`;
@@ -2223,16 +2228,27 @@
           const response = await fetch(localUrl, { signal });
           if (response.ok) return response;
         } catch (error) {
-          if (error.name === 'AbortError') throw error;
+          if (error.name === 'AbortError' || signal?.aborted) throw error;
         }
       }
-
-      const response = getToken()
-        ? await fetch(contentsApiUrl(path), { headers: ghHeaders(true), signal })
-        : await fetch(rawUrl(path), { signal });
-      updateRateBadge(response);
-      if (!response.ok) throw new Error(`Failed to load ${path}: ${response.status}`);
-      return response;
+      if (getToken()) {
+          const response = await fetch(contentsApiUrl(path), { headers: ghHeaders(true), signal });
+          updateRateBadge(response);
+          if (response.ok) return response;
+          throw new Error(`Failed to load ${path}: ${response.status}`);
+      }
+      let lastError = null;
+      for (const url of [jsDelivrAssetUrl(path), rawUrl(path)]) {
+        try {
+          const response = await fetch(url, { signal });
+          if (response.ok) return response;
+          lastError = new Error(`Failed to load ${path}: ${response.status}`);
+        } catch (error) {
+          if (error.name === 'AbortError' || signal?.aborted) throw error;
+          lastError = error;
+        }
+      }
+      throw lastError || new Error(`Failed to load ${path}.`);
     };
 
     const fetchFileText = async (path, signal) => {
@@ -2475,7 +2491,7 @@
       const timeoutId = setTimeout(() => {
         timedOut = true;
         requestController.abort();
-      }, 10000);
+      }, 15000);
 
       try {
         const response = await fetch(jsDelivrDirectoryUrl(version, path), {
@@ -3292,14 +3308,12 @@
     const resolveMediaUrl = async (path, signal) => {
       const local = localUrlFor(path);
       if (local && !getToken()) return local;
-      if (!getToken()) return rawUrl(path);
       return fetchFileBlob(path, undefined, signal);
     };
 
     const createFileUrl = async (path, signal) => {
       const local = localUrlFor(path);
       if (local && !getToken()) return local;
-      if (!getToken()) return rawUrl(path);
       return fetchFileBlob(path, undefined, signal);
     };
 
@@ -3685,7 +3699,7 @@
       state.repoInfoError = null;
       state.repoInfoPromise = null;
 
-      $('tree').innerHTML = `<div class="notice" role="status">${loadingMarkup('Loading files...')}</div>`;
+      $('tree').innerHTML = `<div class="notice" role="status">${loadingMarkup('Loading files…')}</div>`;
       treeRows = [];
       $('fileCount').textContent = '—';
       $('fileCount').title = 'Loading repository tree';
@@ -3863,6 +3877,7 @@
       state.rootNode = null;
       state.treeVersion += 1;
       state.currentFilePath = '';
+      state.currentFolderPath = '';
       branchList = null;
       clearFileMemoryCache();
       clearBlobUrls();
@@ -3890,7 +3905,16 @@
         selectFile(readme[1].path, anchor, silent ? 'none' : 'push');
         return;
       }
-      renderHomeState();
+      state.currentFilePath = '';
+      state.currentFolderPath = '';
+      updateActiveFolder('');
+      updateActiveRow('');
+      setContentHeader('', '', '');
+      const notice = document.createElement('div');
+      notice.className = 'notice error';
+      notice.setAttribute('role', 'status');
+      notice.textContent = `Choose a file from the tree to view it.`;
+      $('contentBody').replaceChildren(notice);
     };
 
     const getRepoStats = () => {
@@ -4604,7 +4628,8 @@
           try {
             const ext = extOf(item.path);
             if (IMAGE_EXTS.includes(ext) && ext !== 'svg') {
-              await resolveMediaUrl(item.path, new AbortController().signal);
+              const mediaUrl = await resolveMediaUrl(item.path, new AbortController().signal);
+              if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl);
             } else if (SHEET_EXTS.includes(ext)) {
               const data = await fetchFileArrayBuffer(item.path, new AbortController().signal);
               await ensureSpreadsheet();
