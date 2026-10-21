@@ -1,7 +1,6 @@
 const CACHE_NAME = 'litegh-v1';
 const APP_SHELL = [
   '/',
-  '/404.html',
   '/manifest.webmanifest',
   '/icons/favicon.ico',
   '/icons/icon-32.png',

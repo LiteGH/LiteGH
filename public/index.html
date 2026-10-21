@@ -8,13 +8,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="LiteGH">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <!--<link rel="manifest" href="/manifest.webmanifest">-->
   <link rel="icon" href="/icons/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="preconnect" href="https://api.github.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <meta name="description" content="LiteGH — a minimal, lightweight GitHub repository browser for older devices and AI agents.">
+  <!--LITEGH_SSR_BOOTSTRAP-->
   <title>LiteGH</title>
   <style>
     :root {
@@ -904,6 +905,14 @@
       font-size: 0.68rem;
     }
 
+    .ssr-tree-link {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .ssr-tree-link:hover { color: var(--accent); }
+    .ssr-folder-link { margin-left: auto; color: var(--muted); text-decoration: none; font-size: 0.72rem; }
+    .ssr-folder-link:hover { color: var(--accent); }
+
     .folder-placeholder {
       padding: 0.35rem 0.55rem 0.45rem 2.2rem;
       color: var(--muted);
@@ -1284,6 +1293,13 @@
     .markdown-body th {
       background: var(--surface-2);
     }
+
+    .markdown-body th.align-left,
+    .markdown-body td.align-left { text-align: left; }
+    .markdown-body th.align-center,
+    .markdown-body td.align-center { text-align: center; }
+    .markdown-body th.align-right,
+    .markdown-body td.align-right { text-align: right; }
 
     .markdown-body kbd,
     kbd {
@@ -2000,6 +2016,8 @@
   </div>
 
   <script>
+    const SSR_BOOTSTRAP = window.__LITEGH_SSR__ || null;
+
     const CONFIG = {
       owner: '',
       repo: '',
@@ -2051,6 +2069,7 @@
       codeCloneType: 'https',
       historyCache: new Map(),
       historyRequests: new Map(),
+      ssrRefreshController: null,
     };
 
     const THIRD_PARTY = {
@@ -3689,9 +3708,7 @@
       return { owner: CONFIG.owner, repo: CONFIG.repo, branch: CONFIG.branch, file: '' };
     };
 
-    const getRepoInfo = async (signal) => {
-      const url = `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}`;
-      const data = await ghApi(url, signal);
+    const applyRepoInfoData = (data) => {
       state.defaultBranch = data.default_branch || state.branch;
       state.repoUpdated = data.pushed_at || state.repoUpdated || '';
       state.repoDescription = data.description || '';
@@ -3714,6 +3731,12 @@
         state.pendingInitialReadme = false;
         autoSelectReadme(true);
       }
+    };
+
+    const getRepoInfo = async (signal) => {
+      const url = `https://api.github.com/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}`;
+      const data = await ghApi(url, signal);
+      applyRepoInfoData(data);
     };
 
     const safeHttpUrl = (value) => {
@@ -4980,7 +5003,189 @@
       render(done, pass, fail, skip);
     };
 
+    const hydrateFromServerSnapshot = (route) => {
+      const snapshot = SSR_BOOTSTRAP;
+      if (!snapshot || snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.tree) ||
+          !snapshot.owner || !snapshot.repo || !snapshot.branch ||
+          snapshot.owner.toLowerCase() !== state.owner.toLowerCase() ||
+          snapshot.repo.toLowerCase() !== state.repo.toLowerCase() ||
+          route?.branch || route?.file || route?.folder || route?.mode) return false;
+
+      state.branch = snapshot.branch;
+      state.cdnVersion = snapshot.branch;
+      state.defaultBranch = snapshot.branch;
+      state.pendingInitialReadme = false;
+      state.repoInfoError = null;
+      state.repoInfoPromise = null;
+      applyRepoInfoData(snapshot.metadata || {});
+      state.branch = snapshot.branch;
+      state.cdnVersion = snapshot.branch;
+      mergeRecursiveTree(snapshot.tree, snapshot.treeSha || '');
+      state.treeFullyLoaded = Boolean(snapshot.treeComplete);
+      state.currentFilePath = snapshot.readmePath || '';
+      state.currentFolderPath = '';
+      state.activePanel = null;
+      state.panelReturnPath = '';
+      lastRawText = typeof snapshot.readmeMarkdown === 'string' ? snapshot.readmeMarkdown : '';
+      renderTree();
+      updateRepoHeader();
+      updateBranchControl();
+      if (state.currentFilePath) {
+        setContentHeader(state.currentFilePath, extOf(state.currentFilePath));
+        updateActiveRow(state.currentFilePath);
+        updateActiveFolder('');
+        wireServerRenderedMarkdown();
+      } else {
+        setContentHeader('', '');
+      }
+      cacheRepo();
+      return true;
+    };
+
+    const wireServerRenderedMarkdown = () => {
+      const body = $('contentBody');
+      body.querySelectorAll('img[data-fallback-src]').forEach((img) => {
+        img.addEventListener('error', () => {
+          const fallback = img.dataset.fallbackSrc;
+          if (!fallback || img.dataset.fallbackTried === '1') return;
+          img.dataset.fallbackTried = '1';
+          img.src = fallback;
+        }, { once: true });
+      });
+      body.querySelectorAll('a[data-repo-path]').forEach((link) => {
+        link.addEventListener('click', async (event) => {
+          if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+          const path = link.dataset.repoPath;
+          if (!path) return;
+          event.preventDefault();
+          const target = await ensureTreePath(path);
+          if (target?.type === 'tree') await openFolderRoute(path, 'push');
+          else selectFile(path);
+        });
+      });
+    };
+
+    const fetchFreshRepositoryText = async (path, signal) => {
+      if (getToken()) {
+        const response = await fetch(contentsApiUrl(path), { headers: ghHeaders(true), signal });
+        updateRateBadge(response);
+        if (!response.ok) throw new Error(`GitHub Contents API returned ${response.status}.`);
+        return response.text();
+      }
+      let lastError;
+      for (const url of [jsDelivrAssetUrl(path), rawUrl(path)]) {
+        const controller = new AbortController();
+        const abortParent = () => controller.abort();
+        if (signal?.aborted) controller.abort();
+        else signal?.addEventListener('abort', abortParent, { once: true });
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const response = await fetch(url, { signal: controller.signal, cache: 'no-cache' });
+          if (!response.ok) throw new Error(`File request returned ${response.status}.`);
+          return await response.text();
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          lastError = error;
+        } finally {
+          clearTimeout(timeoutId);
+          signal?.removeEventListener('abort', abortParent);
+        }
+      }
+      throw lastError || new Error('Unable to refresh file content.');
+    };
+
+    const reconcileHydratedRoot = (items) => {
+      if (!state.rootNode || !Array.isArray(items)) return;
+      const root = state.rootNode;
+      const oldChildren = root.children;
+      const incoming = new Map(items.map((item) => [item.path.split('/').pop(), item]));
+      const nextChildren = Object.create(null);
+      let changed = false;
+      for (const [name, node] of Object.entries(oldChildren)) {
+        if (!incoming.has(name)) {
+          changed = true;
+          state.tree = state.tree.filter((item) => item.path !== node.path && !item.path.startsWith(`${node.path}/`));
+        }
+      }
+      for (const [name, item] of incoming) {
+        const existing = oldChildren[name];
+        if (item.type === 'tree') {
+          const node = existing?.type === 'tree' ? existing : {
+            type: 'tree', path: item.path, children: Object.create(null), loaded: false,
+            loading: false, request: null, source: item,
+          };
+          node.path = item.path;
+          node.source = { ...(node.source || {}), ...item, cdnVersion: state.cdnVersion };
+          if (!existing || existing.type !== 'tree') {
+            changed = true;
+            state.tree.push({ ...item });
+          }
+          nextChildren[name] = node;
+        } else {
+          const current = state.treeIndex.get(item.path);
+          const next = { ...(current || {}), ...item, path: item.path, type: 'blob', size: Number(item.size || 0) };
+          nextChildren[name] = next;
+          if (!current || current.size !== next.size) changed = true;
+          if (current) Object.assign(current, next);
+          else state.tree.push(next);
+        }
+      }
+      root.children = nextChildren;
+      root.loaded = true;
+      state.treeIndex = new Map(state.tree.map((item) => [item.path, item]));
+      if (changed) state.treeFullyLoaded = false;
+    };
+
+    const refreshHydratedSnapshot = async (snapshot) => {
+      if (!snapshot || state.owner !== snapshot.owner || state.repo !== snapshot.repo || state.branch !== snapshot.branch) return;
+      state.ssrRefreshController?.abort();
+      const controller = new AbortController();
+      state.ssrRefreshController = controller;
+      const stillCurrent = () => !controller.signal.aborted && state.owner === snapshot.owner && state.repo === snapshot.repo && state.branch === snapshot.branch;
+      const jobs = [
+        getRepoInfo(controller.signal).catch((error) => {
+          if (!controller.signal.aborted) console.warn('LiteGH background metadata refresh failed:', error);
+        }),
+        loadTreeFromJsDelivrDirectory(controller.signal, snapshot.branch, '', false).then(({ items }) => {
+          if (!stillCurrent()) return;
+          const openFolders = Array.from(document.querySelectorAll('.folder-wrap[open]')).map((node) => node.dataset.folderPath);
+          reconcileHydratedRoot(items);
+          renderTree();
+          openFolders.forEach((path) => {
+            const details = document.querySelector(`details[data-folder-path="${CSS.escape(path)}"]`);
+            const node = directoryNodeFor(path);
+            if (details && node?.loaded) {
+              details.open = true;
+              const holder = details.querySelector(':scope > .folder-children');
+              if (holder) holder.innerHTML = renderFolderChildren(node, path, path ? path.split('/').length : 0);
+            }
+          });
+          updateRepoHeader();
+          updateBranchControl();
+          cacheRepo();
+        }).catch((error) => {
+          if (!controller.signal.aborted) console.warn('LiteGH background tree refresh failed:', error);
+        }),
+      ];
+      if (snapshot.readmePath) {
+        jobs.push((async () => {
+          try {
+            const text = await fetchFreshRepositoryText(snapshot.readmePath, controller.signal);
+            if (!stillCurrent() || state.currentFilePath !== snapshot.readmePath || text === lastRawText) return;
+            await renderMarkdown(text, snapshot.readmePath, controller.signal, parseHash().anchor);
+            if (stillCurrent()) lastRawText = text;
+          } catch (error) {
+            if (!controller.signal.aborted) console.warn('LiteGH background README refresh failed:', error);
+          }
+        })());
+      }
+      await Promise.allSettled(jobs);
+      if (state.ssrRefreshController === controller) state.ssrRefreshController = null;
+    };
+
     const bootRepo = async () => {
+      state.ssrRefreshController?.abort();
+      state.ssrRefreshController = null;
       await detectLocalMode();
       const route = await detectRepo();
       state.activePanel = null;
@@ -5010,6 +5215,10 @@
       state.currentFilePath = route?.file || '';
       state.pendingInitialReadme = !route?.file && route?.mode !== 'tree' && !route?.branch;
       if (route?.fromQuery) canonicalizeQueryRoute(route);
+      if (hydrateFromServerSnapshot(route)) {
+        void refreshHydratedSnapshot(SSR_BOOTSTRAP);
+        return;
+      }
       updateRepoHeader();
       await fetchTree();
       if (route?.file) {
@@ -5037,7 +5246,7 @@
       setupControls();
       await bootRepo();
     };
-
+/*
     let deferredInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
@@ -5063,7 +5272,7 @@
         });
       });
     }
-
+*/
     window.addEventListener('error', (event) => console.error('LiteGH error:', event.message));
     window.addEventListener('unhandledrejection', (event) => console.error('LiteGH unhandled rejection:', event.reason));
 
