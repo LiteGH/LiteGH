@@ -13,3 +13,20 @@ run_worker_first = true
 [[kv_namespaces]]
 binding = "REPO_SNAPSHOTS"
 id = "a2062c5b40c64e648141e897823021eb"
+
+[cache]
+enabled = true
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[observability.issue_detection]
+enabled = true
