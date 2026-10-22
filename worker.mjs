@@ -12,17 +12,22 @@ const MAX_TREE_ENTRIES = 5_000;
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return serveAsset(request, env);
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') return serveAsset(request, env);
+
+    const fileRoute = parseRepositoryFileRoute(url.pathname);
+    if (fileRoute && isSsrTextPath(fileRoute.file)) {
+      return handleTextFileRequest(request, env, ctx, fileRoute);
     }
 
     const route = parseRepositoryRootRoute(url.pathname);
     if (!route) return serveAsset(request, env);
 
-    const format = url.searchParams.get('format') === 'markdown' || acceptsMarkdown(request.headers.get('Accept')) ? 'markdown' : 'html';
+    const format = url.searchParams.get('format') === 'markdown' ||
+      acceptsMarkdown(request.headers.get('Accept')) ? 'markdown' : 'html';
     const cache = caches.default;
     const cacheKey = new Request(
-      `${url.origin}/__litegh_cache/v${SCHEMA_VERSION}/${encodeURIComponent(route.owner.toLowerCase())}/${encodeURIComponent(route.repo.toLowerCase())}/${format}`,
+      `${url.origin}/__litegh_ssr_cache/v${SCHEMA_VERSION}/${encodeURIComponent(route.owner.toLowerCase())}/${encodeURIComponent(route.repo.toLowerCase())}/${format}`,
       { method: 'GET' },
     );
 
@@ -156,8 +161,41 @@ function parseRepositoryRootRoute(pathname) {
   }
   if (!/^[A-Za-z0-9_.-]{1,100}$/.test(owner) || !/^[A-Za-z0-9_.-]{1,100}$/.test(repo)) return null;
   if (owner === '.' || owner === '..' || repo === '.' || repo === '..') return null;
-  if (/^(?:api|auth|oauth|callback|health|healthz|icons|assets|fonts|images|css|js|\.well-known)$/i.test(owner) || /\.(?:php|phtml|asp|aspx|cgi|html?|css|js|mjs|cjs|json|webmanifest|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|map)$/i.test(repo)) return null;
   return { owner, repo };
+}
+
+function parseRepositoryFileRoute(pathname) {
+  const rawParts = pathname.split('/').filter(Boolean);
+  if (rawParts.length < 5 || rawParts[2] !== 'blob') return null;
+  let owner, repo, ref, file;
+  try {
+    owner = decodeURIComponent(rawParts[0]);
+    repo = decodeURIComponent(rawParts[1]);
+    ref = decodeURIComponent(rawParts[3]);
+    file = rawParts.slice(4).map((part) => decodeURIComponent(part)).join('/');
+  } catch (_) { return null; }
+  if (!/^[A-Za-z0-9_.-]{1,100}$/.test(owner) || !/^[A-Za-z0-9_.-]{1,100}$/.test(repo) ||
+      !ref || ref === '.' || ref === '..' || !file || file.startsWith('/') ||
+      file.split('/').some((part) => !part || part === '.' || part === '..')) return null;
+  return { owner, repo, branch: ref, file };
+}
+
+const SSR_TEXT_EXTENSIONS = new Set([
+  'md', 'markdown', 'mdown', 'mkd', 'mdx', 'txt', 'text', 'rst', 'adoc', 'asciidoc',
+  'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'json', 'jsonc', 'json5', 'css', 'scss', 'sass', 'less',
+  'html', 'htm', 'xml', 'svg', 'yml', 'yaml', 'toml', 'ini', 'conf', 'cfg', 'env', 'sh', 'bash',
+  'zsh', 'fish', 'py', 'pyi', 'rb', 'php', 'java', 'kt', 'kts', 'go', 'rs', 'c', 'h', 'cc', 'cpp',
+  'hpp', 'cs', 'fs', 'fsx', 'swift', 'm', 'mm', 'sql', 'graphql', 'gql', 'proto', 'vue', 'svelte',
+  'astro', 'dockerfile', 'makefile', 'gradle', 'properties', 'log', 'csv', 'tsv', 'diff', 'patch',
+  'gitignore', 'gitattributes', 'editorconfig', 'lock', 'ps1', 'bat', 'cmd', 'ex', 'exs', 'erl', 'hrl',
+  'clj', 'cljs', 'cljc', 'scala', 'sc', 'dart', 'lua', 'pl', 'pm', 'r', 'jl', 'tex', 'bib'
+]);
+
+function isSsrTextPath(path) {
+  const name = String(path || '').split('/').pop().toLowerCase();
+  if (['dockerfile', 'makefile', 'gnumakefile', 'justfile', '.gitignore', '.gitattributes', '.editorconfig', '.npmrc', '.nvmrc', '.prettierrc'].includes(name)) return true;
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && SSR_TEXT_EXTENSIONS.has(name.slice(dot + 1));
 }
 
 function acceptsMarkdown(accept) {
@@ -178,6 +216,212 @@ async function refreshSnapshot(route, env) {
   await env.REPO_SNAPSHOTS.put(`repo:v${SCHEMA_VERSION}:${route.owner.toLowerCase()}/${route.repo.toLowerCase()}`, JSON.stringify(fresh), {
     expirationTtl: SNAPSHOT_RETENTION_SECONDS,
   });
+}
+
+async function handleTextFileRequest(request, env, ctx, route) {
+  const url = new URL(request.url);
+  const format = url.searchParams.get('format') === 'markdown' || acceptsMarkdown(request.headers.get('Accept'))
+    ? 'markdown' : 'html';
+  const cache = caches.default;
+  const cacheRef = encodeURIComponent(route.branch);
+  const cachePath = encodeURIComponent(route.file);
+  const cacheKey = new Request(
+    `${url.origin}/__litegh_ssr_cache/v${SCHEMA_VERSION}/file/${encodeURIComponent(route.owner.toLowerCase())}/${encodeURIComponent(route.repo.toLowerCase())}/${cacheRef}/${cachePath}?format=${format}`,
+    { method: 'GET' },
+  );
+
+  try {
+    const edgeHit = await cache.match(cacheKey);
+    if (edgeHit) {
+      const headers = new Headers(edgeHit.headers);
+      headers.set('X-LiteGH-SSR-Cache', 'HIT');
+      return new Response(request.method === 'HEAD' ? null : edgeHit.body, {
+        status: edgeHit.status, statusText: edgeHit.statusText, headers,
+      });
+    }
+  } catch (error) {
+    console.warn('LiteGH file edge cache lookup failed:', error);
+  }
+
+  let snapshot;
+  let cacheStatus = 'MISS';
+  const snapshotKey = `repo:v${SCHEMA_VERSION}:${route.owner.toLowerCase()}/${route.repo.toLowerCase()}`;
+  try {
+    snapshot = env.REPO_SNAPSHOTS ? await env.REPO_SNAPSHOTS.get(snapshotKey, 'json') : null;
+  } catch (error) {
+    console.warn('LiteGH file snapshot KV read failed:', error);
+  }
+
+  if (!isValidSnapshot(snapshot, route)) snapshot = null;
+  if (snapshot) {
+    const age = Date.now() - Date.parse(snapshot.fetchedAt);
+    if (Number.isFinite(age) && age <= SNAPSHOT_FRESH_MS) cacheStatus = 'KV-HIT';
+    else if (Number.isFinite(age) && age <= SNAPSHOT_MAX_STALE_MS) {
+      cacheStatus = 'STALE';
+      ctx.waitUntil(refreshSnapshot({ owner: route.owner, repo: route.repo }, env).catch((error) => console.warn('LiteGH file stale refresh failed:', error)));
+    } else snapshot = null;
+  }
+
+  if (!snapshot) {
+    try {
+      snapshot = await buildSnapshot(route.owner, route.repo, env);
+      if (snapshot.metadata?.private || !snapshot.tree?.length) return serveShellWithoutSSR(request, env);
+      cacheStatus = 'BUILT';
+      if (env.REPO_SNAPSHOTS) {
+        ctx.waitUntil(env.REPO_SNAPSHOTS.put(snapshotKey, JSON.stringify(snapshot), {
+          expirationTtl: SNAPSHOT_RETENTION_SECONDS,
+        }).catch((error) => console.warn('LiteGH file snapshot KV write failed:', error)));
+      }
+    } catch (error) {
+      console.warn(`LiteGH file SSR could not load ${route.owner}/${route.repo}:`, error);
+      return serveShellWithoutSSR(request, env);
+    }
+  }
+  if (snapshot.metadata?.private || route.branch === '' || !snapshot.tree?.length) return serveShellWithoutSSR(request, env);
+
+  let viewSnapshot = snapshot;
+  if (route.branch !== snapshot.branch) {
+    // For non-default branches/tags/commits, only the per-response edge cache is
+    // written. Do not spend a KV write for every ref or every file.
+    let tree = null;
+    let treeComplete = false;
+    try {
+      const [cdnRoot, apiTree] = await Promise.all([
+        fetchJsDelivrDirectory(route.owner, route.repo, route.branch).catch(() => null),
+        fetchGithubTree(route.owner, route.repo, route.branch, env).catch(() => null),
+      ]);
+      if (apiTree?.tree?.length) {
+        tree = apiTree.tree.filter((item) => item?.path && ['blob', 'tree'].includes(item.type)).slice(0, MAX_TREE_ENTRIES);
+        treeComplete = !apiTree.truncated && apiTree.tree.length <= MAX_TREE_ENTRIES;
+        if (cdnRoot?.length) {
+          const rootByPath = new Map(cdnRoot.map((item) => [item.path, item]));
+          tree = tree.map((item) => {
+            const rootItem = rootByPath.get(item.path);
+            return rootItem && item.type === 'blob' ? { ...item, size: rootItem.size || item.size || 0 } : item;
+          });
+        }
+      } else if (cdnRoot?.length) {
+        tree = cdnRoot.map((item) => ({ ...item, sha: '', mode: item.type === 'tree' ? '040000' : '100644' }));
+      }
+    } catch (error) {
+      console.warn('LiteGH ref-specific tree lookup failed:', error);
+    }
+    if (!tree?.length) return serveShellWithoutSSR(request, env);
+    viewSnapshot = { ...snapshot, branch: route.branch, tree, treeComplete, readmePath: '', readmeMarkdown: '', readmeTruncated: false };
+  }
+
+  let fileResult;
+  try {
+    fileResult = await fetchRepositoryText(route.owner, route.repo, route.branch, route.file, MAX_SSR_FILE_BYTES);
+  } catch (error) {
+    console.warn(`LiteGH file content fetch failed for ${route.owner}/${route.repo}/${route.branch}/${route.file}:`, error);
+    return serveShellWithoutSSR(request, env);
+  }
+  if (fileResult.truncated) return serveShellWithoutSSR(request, env);
+  const fileSize = new TextEncoder().encode(fileResult.text).byteLength;
+  viewSnapshot = ensureFilePathInSnapshot(viewSnapshot, route.file, fileSize);
+
+  let response;
+  if (format === 'markdown') {
+    const markdownFile = /\.(?:md|markdown|mdown|mkd|mdx)$/i.test(route.file);
+    response = new Response(fileResult.text, {
+      status: 200,
+      headers: {
+        'Content-Type': markdownFile ? 'text/markdown; charset=utf-8' : 'text/plain; charset=utf-8',
+        'Cache-Control': `public, max-age=30, s-maxage=${FILE_EDGE_TTL_SECONDS}, stale-while-revalidate=86400`,
+        'Vary': 'Accept',
+        'Link': `<${liteRoute({ owner: route.owner, repo: route.repo }, route.branch, route.file, false)}>; rel="alternate"; type="text/html"`,
+        'X-LiteGH-SSR-Cache': cacheStatus,
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } else {
+    response = await renderTextFileHtmlResponse(viewSnapshot, route, fileResult, request, env, cacheStatus);
+  }
+
+  try {
+    if (response.ok && response.headers.get('Cache-Control')?.includes('public')) {
+      ctx.waitUntil(cache.put(cacheKey, response.clone()).catch((error) => console.warn('LiteGH file edge cache write failed:', error)));
+    }
+  } catch (error) {
+    console.warn('LiteGH file edge cache write failed:', error);
+  }
+  return request.method === 'HEAD' ? new Response(null, { status: response.status, headers: response.headers }) : response;
+}
+
+const MAX_SSR_FILE_BYTES = 128 * 1024;
+const FILE_EDGE_TTL_SECONDS = 600;
+
+function ensureFilePathInSnapshot(snapshot, filePath, fileSize) {
+  const tree = Array.isArray(snapshot.tree) ? snapshot.tree.map((item) => ({ ...item })) : [];
+  const byPath = new Map(tree.map((item) => [item.path, item]));
+  const parts = filePath.split('/');
+  for (let i = 1; i < parts.length; i += 1) {
+    const path = parts.slice(0, i).join('/');
+    if (!byPath.has(path)) {
+      const dir = { path, type: 'tree', size: 0, sha: '', mode: '040000' };
+      tree.push(dir);
+      byPath.set(path, dir);
+    }
+  }
+  const existing = byPath.get(filePath);
+  if (existing) Object.assign(existing, { type: 'blob', size: fileSize });
+  else tree.push({ path: filePath, type: 'blob', size: fileSize, sha: '', mode: '100644' });
+  return { ...snapshot, tree, treeComplete: Boolean(snapshot.treeComplete) };
+}
+
+async function renderTextFileHtmlResponse(snapshot, route, fileResult, request, env, cacheStatus) {
+  const base = await getShellHtml(request, env);
+  if (!base) return new Response('LiteGH static shell is unavailable. Configure the ASSETS binding.', { status: 500 });
+  const ownerRepoPath = `/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
+  const fileUrl = liteRoute({ owner: route.owner, repo: route.repo }, route.branch, route.file, false);
+  const alternateUrl = `${fileUrl}?format=markdown`;
+  const ext = route.file.includes('.') ? route.file.split('.').pop().toLowerCase() : '';
+  const pageSnapshot = {
+    ...snapshot,
+    ssrFile: { path: route.file, text: fileResult.text, truncated: Boolean(fileResult.truncated), bytes: new TextEncoder().encode(fileResult.text).byteLength },
+  };
+  const json = safeJsonForHtml(pageSnapshot);
+  let content;
+  if (/^(?:md|markdown|mdown|mkd|mdx)$/i.test(ext)) {
+    content = `<article class="markdown-body ssr-markdown-body" data-ssr-file="${escapeHtml(route.file)}">${renderMarkdownToHtml(fileResult.text, snapshot, { owner: route.owner, repo: route.repo }, route.file)}</article>`;
+  } else {
+    const language = languageForExtension(ext);
+    content = `<div class="source-block ssr-source-block"><pre><code${language ? ` class="language-${escapeHtml(language)}"` : ''}>${escapeHtml(fileResult.text)}</code></pre></div>`;
+  }
+
+  const treeHtml = renderTreeMarkup(snapshot, { owner: route.owner, repo: route.repo }, route.file);
+  const summaryHtml = renderRepoSummary(snapshot);
+  let html = base;
+  html = html.replace('<!--LITEGH_SSR_BOOTSTRAP-->', `<script>window.__LITEGH_SSR__=${json};</script>`);
+  html = html.replace('<title>LiteGH</title>', `<title>${escapeHtml(route.owner)} / ${escapeHtml(route.repo)} · ${escapeHtml(route.file)} · LiteGH</title>`);
+  html = html.replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escapeHtml(snapshot.metadata.description || `Browse ${route.owner}/${route.repo} on LiteGH.`)}">`);
+  html = html.replace('</head>', `<link rel="alternate" type="text/markdown" href="${escapeHtml(alternateUrl)}">\n</head>`);
+  html = html.replace(/<div id="repoSummary" class="repo-summary" hidden><\/div>/, `<div id="repoSummary" class="repo-summary">${summaryHtml}</div>`);
+  html = html.replace(/<div id="branchControl" class="branch-control" hidden>/, '<div id="branchControl" class="branch-control">');
+  html = html.replace(/<span id="branchLabel" class="branch-button-label"><\/span>/, `<span id="branchLabel" class="branch-button-label">${escapeHtml(route.branch)}</span>`);
+  html = html.replace(/<div id="codeControl" class="code-control" hidden>/, '<div id="codeControl" class="code-control">');
+  html = html.replace(/<div id="fileCount" class="file-count">—<\/div>/, `<div id="fileCount" class="file-count" title="Server-rendered tree">${countTreeFiles(snapshot.tree)} files</div>`);
+  html = html.replace(/<div id="tree" class="tree" tabindex="0"><\/div>/, `<div id="tree" class="tree" tabindex="0">${treeHtml}</div>`);
+  html = html.replace(/<div id="breadcrumbs" class="breadcrumbs"><span class="crumb-file"><\/span><\/div>/, `<div id="breadcrumbs" class="breadcrumbs"><a href="${escapeHtml(ownerRepoPath)}">${escapeHtml(route.owner)} / ${escapeHtml(route.repo)}</a><span>/</span><a href="${escapeHtml(`${ownerRepoPath}/tree/${encodeURIComponent(route.branch)}/`)}">${escapeHtml(route.branch)}</a><span>/</span><span class="crumb-file">${escapeHtml(route.file)}</span></div>`);
+  html = html.replace(/<div id="contentBody" class="content-body">[\s\S]*?<\/div>\s*<footer class="app-footer">/, `<div id="contentBody" class="content-body">${content}</div>\n          <footer class="app-footer">`);
+  html = html.replace('</body>', `<script>document.documentElement.dataset.liteghSsr="1";</script>\n</body>`);
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': `public, max-age=30, s-maxage=${FILE_EDGE_TTL_SECONDS}, stale-while-revalidate=86400`,
+      'Vary': 'Accept',
+      'Link': `<${alternateUrl}>; rel="alternate"; type="text/markdown"`,
+      'X-LiteGH-SSR-Cache': cacheStatus,
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
+function languageForExtension(ext) {
+  const aliases = { md: 'markdown', mdx: 'markdown', js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', tsx: 'tsx', py: 'python', sh: 'bash', yml: 'yaml', htm: 'html', h: 'c', hpp: 'cpp', rs: 'rust', go: 'go', rb: 'ruby', ps1: 'powershell', gql: 'graphql', lock: 'text' };
+  return aliases[ext] || (SSR_TEXT_EXTENSIONS.has(ext) ? ext : '');
 }
 
 async function buildSnapshot(owner, repo, env = {}) {
@@ -349,14 +593,14 @@ function parseReadableSize(value) {
   return Math.round(amount * (1024 ** (powers[(match[2] || 'B').toUpperCase()] ?? 0)));
 }
 
-async function fetchRepositoryText(owner, repo, branch, path) {
+async function fetchRepositoryText(owner, repo, branch, path, maxBytes = MAX_README_BYTES) {
   const cdn = `https://cdn.jsdelivr.net/gh/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}@${encodeURIComponent(branch)}/${encodePath(path)}`;
   const raw = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${encodePath(path)}`;
   let lastError;
   for (const url of [cdn, raw]) {
     try {
       const { response, text, truncated } = await fetchTextLimitedWithTimeout(
-        url, { headers: { Accept: 'text/plain,*/*' } }, UPSTREAM_TIMEOUT_MS, MAX_README_BYTES,
+        url, { headers: { Accept: 'text/plain,*/*' } }, UPSTREAM_TIMEOUT_MS, maxBytes
       );
       if (!response.ok) throw new Error(`${url} returned ${response.status}`);
       return { text, truncated };
@@ -443,7 +687,7 @@ async function renderHtmlResponse(snapshot, route, request, env, cacheStatus) {
   const path = `/${encodeURIComponent(route.owner)}/${encodeURIComponent(route.repo)}`;
   const markdownUrl = `${path}?format=markdown`;
   const json = safeJsonForHtml(snapshot);
-  const treeHtml = renderTreeMarkup(snapshot, route);
+  const treeHtml = renderTreeMarkup(snapshot, route, snapshot.readmePath || '');
   const summaryHtml = renderRepoSummary(snapshot);
   const readmeHtml = snapshot.readmePath
     ? `<article class="markdown-body ssr-markdown-body" data-ssr-readme="${escapeHtml(snapshot.readmePath)}">${renderMarkdownToHtml(snapshot.readmeMarkdown || '', snapshot, route, snapshot.readmePath)}</article>${snapshot.readmeTruncated ? '<div class="notice" role="status">This README preview is limited to 128 KiB on the server. LiteGH will try to load the complete file in the browser.</div>' : ''}`
@@ -536,7 +780,7 @@ function renderRepoSummary(snapshot) {
   return `<div class="repo-summary-name"><svg class="ui-icon" aria-hidden="true"><use href="#i-github"></use></svg><a href="https://github.com/${encodeURIComponent(snapshot.owner)}/${encodeURIComponent(snapshot.repo)}/" target="_blank" rel="noopener noreferrer" title="Open repository on GitHub">${escapeHtml(ownerRepo)}</a>${m.private ? '<svg class="ui-icon" aria-label="Private repository"><use href="#i-lock"></use></svg>' : ''}</div>${fork}${m.description ? `<p class="repo-summary-description">${escapeHtml(m.description)}</p>` : ''}<div class="repo-summary-meta"><span class="repo-summary-stat" title="Stars"><svg class="ui-icon" aria-hidden="true"><use href="#i-star"></use></svg>${Number(m.stargazers_count || 0).toLocaleString('en-US')}</span><span class="repo-summary-stat" title="Forks"><svg class="ui-icon" aria-hidden="true"><use href="#i-fork"></use></svg>${Number(m.forks_count || 0).toLocaleString('en-US')}</span><span class="repo-summary-stat" title="Watchers"><svg class="ui-icon" aria-hidden="true"><use href="#i-eye"></use></svg>${Number(m.subscribers_count || 0).toLocaleString('en-US')}</span>${pushedDate ? `<span class="repo-summary-stat" title="${escapeHtml(m.pushed_at)}"><svg class="ui-icon" aria-hidden="true"><use href="#i-clock"></use></svg>${escapeHtml(pushedDate)}</span>` : ''}${m.language ? `<span class="repo-summary-stat" title="Main language"><svg class="ui-icon" aria-hidden="true"><use href="#i-language"></use></svg>${escapeHtml(m.language)}</span>` : ''}${m.license?.spdx_id ? `<span class="repo-summary-stat" title="License"><svg class="ui-icon" aria-hidden="true"><use href="#i-file"></use></svg>${escapeHtml(m.license.spdx_id)}</span>` : ''}${m.archived ? '<span class="repo-summary-stat" title="This repository is archived and read-only"><svg class="ui-icon" aria-hidden="true"><use href="#i-archive"></use></svg>Archived</span>' : ''}${homepageLink}</div>`;
 }
 
-function renderTreeMarkup(snapshot, route) {
+function renderTreeMarkup(snapshot, route, activePath = '') {
   const root = new Map();
   for (const item of snapshot.tree) {
     if (!item?.path || !['blob', 'tree'].includes(item.type)) continue;
@@ -567,11 +811,11 @@ function renderTreeMarkup(snapshot, route) {
     if (node.type === 'tree') {
       const children = renderNodes(node.children, depth + 1);
       const href = liteRoute(route, snapshot.branch, node.path, true);
-      return `<details class="folder-wrap" data-folder-path="${escapeHtml(node.path)}"><summary class="tree-folder tree-indent-${Math.min(depth, 4)}" title="${escapeHtml(node.path)}"><svg class="ui-icon tree-folder-icon" aria-hidden="true"><use href="#i-folder"></use></svg><span class="tree-name">${escapeHtml(node.name)}</span><a class="ssr-folder-link" href="${escapeHtml(href)}" aria-label="Browse folder ${escapeHtml(node.path)}">↗</a></summary><div class="folder-children">${children || '<div class="folder-placeholder">Empty folder</div>'}</div></details>`;
+      return `<details class="folder-wrap" data-folder-path="${escapeHtml(node.path)}"><summary class="tree-folder tree-indent-${Math.min(depth, 4)}${activePath && activePath.startsWith(`${node.path}/`) ? ' active' : ''}" title="${escapeHtml(node.path)}"><svg class="ui-icon tree-folder-icon" aria-hidden="true"><use href="#i-folder"></use></svg><span class="tree-name">${escapeHtml(node.name)}</span><a class="ssr-folder-link" href="${escapeHtml(href)}" aria-label="Browse folder ${escapeHtml(node.path)}">↗</a></summary><div class="folder-children">${children || `<div class="folder-placeholder">${snapshot.treeComplete ? 'Empty folder' : 'Expand to load files'}</div>`}</div></details>`;
     }
     const href = liteRoute(route, snapshot.branch, node.path, false);
     const [icon, kind] = fileIcon(node.name);
-    return `<a class="tree-item tree-indent-${Math.min(depth, 4)} ssr-tree-link" href="${escapeHtml(href)}" role="link" data-action="select-file" data-path="${escapeHtml(node.path)}" title="${escapeHtml(`${node.path}\n${formatBytes(node.size)}`)}"><span class="tree-item-main"><svg class="ui-icon tree-icon file-kind ${kind}" aria-hidden="true"><use href="#${icon}"></use></svg><span class="tree-name">${escapeHtml(node.name)}</span></span><span class="tree-size">${escapeHtml(formatBytes(node.size))}</span></a>`;
+    return `<a class="tree-item tree-indent-${Math.min(depth, 4)} ssr-tree-link${node.path === activePath ? ' active' : ''}" href="${escapeHtml(href)}" role="link" data-action="select-file" data-path="${escapeHtml(node.path)}" title="${escapeHtml(`${node.path}\n${formatBytes(node.size)}`)}"><span class="tree-item-main"><svg class="ui-icon tree-icon file-kind ${kind}" aria-hidden="true"><use href="#${icon}"></use></svg><span class="tree-name">${escapeHtml(node.name)}</span></span><span class="tree-size">${escapeHtml(formatBytes(node.size))}</span></a>`;
   }).join('');
   return renderNodes(root, 0) || '<div class="notice">No visible files in this repository.</div>';
 }
@@ -610,6 +854,22 @@ function renderMarkdownToHtml(markdown, snapshot, route, filePath) {
       continue;
     }
     if (fence) { code.push(line); continue; }
+    const htmlBlockStart = line.match(/^\s{0,3}<(div|table|thead|tbody|tr|td|th|details|summary|section|article|p|h[1-6]|ul|ol|li|dl|dt|dd|pre|blockquote|picture|video|audio|center)\b/i);
+    if (htmlBlockStart) {
+      flushParagraph(); flushList(); flushQuote();
+      const tagName = htmlBlockStart[1].toLowerCase();
+      const blockLines = [line];
+      const countOpens = (value) => (value.match(new RegExp(`<\\s*${tagName}\\b`, 'gi')) || []).length;
+      const countCloses = (value) => (value.match(new RegExp(`<\\s*\\/${tagName}\\b`, 'gi')) || []).length;
+      let balance = countOpens(line) - countCloses(line);
+      while (balance > 0 && lineIndex + 1 < lines.length && blockLines.length < 1000) {
+        const next = lines[++lineIndex];
+        blockLines.push(next);
+        balance += countOpens(next) - countCloses(next);
+      }
+      out.push(sanitizeRawHtmlFragment(blockLines.join('\n'), snapshot, route, filePath));
+      continue;
+    }
     const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (heading) {
       flushParagraph(); flushList(); flushQuote();
@@ -690,7 +950,8 @@ function renderInline(source, snapshot, route, filePath) {
     const isExternal = /^https?:\/\//i.test(url) || url.startsWith('//');
     return stash(`<a href="${escapeHtml(url)}"${dataPath}${isExternal ? ' target="_blank" rel="noopener noreferrer"' : ''}${title ? ` title="${escapeHtml(title)}"` : ''}>${escapeHtml(label)}</a>`);
   });
-  text = escapeHtml(text)
+  text = text.replace(/<!--[\s\S]*?-->|<\/?[a-z][^>]*>/gi, (tag) => stash(sanitizeRawHtmlTag(tag, snapshot, route, filePath)));
+  text = escapeMarkdownText(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/__(.+?)__/g, '<strong>$1</strong>')
     .replace(/~~(.+?)~~/g, '<del>$1</del>')
@@ -699,6 +960,84 @@ function renderInline(source, snapshot, route, filePath) {
     .replace(/ {2}\n/g, '<br>\n')
     .replace(/\n/g, '\n');
   return text.replace(/\u0000(\d+)\u0000/g, (_, index) => tokens[Number(index)] || '');
+}
+
+function escapeMarkdownText(value) {
+  // Keep README entity references (e.g. &middot;) intact while escaping literal
+  // text so it cannot accidentally become HTML.
+  return String(value ?? '')
+    .replace(/&(?!(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);)/gi, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const SAFE_README_HTML_TAGS = new Set([
+  'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'code', 'dd', 'del', 'details', 'div', 'dl', 'dt',
+  'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'input', 'kbd', 'li', 'ol', 'p', 'picture',
+  'pre', 's', 'section', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody',
+  'td', 'th', 'thead', 'tr', 'ul', 'video', 'audio', 'wbr',
+]);
+const SAFE_README_HTML_ATTRS = new Set([
+  'alt', 'align', 'aria-label', 'checked', 'class', 'colspan', 'controls', 'disabled', 'height', 'href', 'id',
+  'label', 'loading', 'loop', 'muted', 'open', 'poster', 'rel', 'rowspan', 'scope', 'src', 'start', 'target',
+  'title', 'type', 'value', 'width', 'autoplay', 'preload', 'kind', 'srclang',
+]);
+const VOID_README_HTML_TAGS = new Set(['br', 'hr', 'img', 'input', 'source', 'wbr']);
+
+function sanitizeRawHtmlFragment(html, snapshot, route, filePath) {
+  let fragment = String(html || '')
+    .replace(/<(script|style|iframe|object|embed|form|button|textarea|select)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(script|style|iframe|object|embed|form|button|textarea|select)\b[^>]*\/?>/gi, '');
+  return fragment.replace(/<!--[\s\S]*?-->|<\/?[a-z][^>]*>/gi, (tag) =>
+    sanitizeRawHtmlTag(tag, snapshot, route, filePath)
+  );
+}
+
+function sanitizeRawHtmlTag(raw, snapshot, route, filePath) {
+  if (/^<!--/.test(raw)) return '';
+  const match = raw.match(/^<\s*(\/?)\s*([a-z][a-z0-9-]*)([\s\S]*?)\s*(\/?)>$/i);
+  if (!match) return '';
+  const closing = Boolean(match[1]);
+  const tag = match[2].toLowerCase();
+  if (!SAFE_README_HTML_TAGS.has(tag)) return '';
+  if (closing) return VOID_README_HTML_TAGS.has(tag) ? '' : `</${tag}>`;
+
+  let attributes = '';
+  let fallbackSrc = '';
+  const attrRegex = /([a-z_:][a-z0-9_.:-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gi;
+  let attrMatch;
+  while ((attrMatch = attrRegex.exec(match[3] || ''))) {
+    const name = attrMatch[1].toLowerCase();
+    let value = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
+    if (!SAFE_README_HTML_ATTRS.has(name) || name.startsWith('on') || name === 'style' || name === 'srcset') continue;
+    if (['checked', 'controls', 'disabled', 'loop', 'muted', 'open', 'autoplay'].includes(name)) {
+      if (value === '' || /^(?:true|checked|open|disabled|controls|loop|muted|autoplay)$/i.test(value)) attributes += ` ${name}=""`;
+      continue;
+    }
+    if (name === 'type' && tag === 'input' && value.toLowerCase() !== 'checkbox') continue;
+    if (name === 'target' && !['_blank', '_self'].includes(value)) continue;
+    if (name === 'href') {
+      const original = value;
+      const url = resolveMarkdownUrl(value, snapshot, route, filePath, false);
+      if (!url) continue;
+      value = url;
+      if (/^https?:\/\//i.test(url) || url.startsWith('//')) attributes += ' target="_blank" rel="noopener noreferrer"';
+      else {
+        const localPath = getRelativeRepoPath(original, filePath);
+        if (localPath) attributes += ` data-repo-path="${escapeHtml(localPath)}"`;
+      }
+    } else if (name === 'src' || name === 'poster') {
+      const original = value;
+      const url = resolveMarkdownUrl(value, snapshot, route, filePath, true);
+      if (!url) continue;
+      value = url;
+      if (name === 'src' && !/^(?:https?:)?\/\//i.test(original) && !/^[a-z][a-z0-9+.-]*:/i.test(original)) fallbackSrc = rawUrlUrl(snapshot, filePath, original);
+    } else if (name === 'rel' && !/^[a-z -]{1,100}$/i.test(value)) continue;
+    attributes += ` ${name}="${escapeHtml(value)}"`;
+  }
+  if (fallbackSrc && tag === 'img') attributes += ` data-fallback-src="${escapeHtml(fallbackSrc)}"`;
+  if (tag === 'a' && /\btarget="_blank"/.test(attributes) && !/\brel=/.test(attributes)) attributes += ' rel="noopener noreferrer"';
+  return `<${tag}${attributes}${VOID_README_HTML_TAGS.has(tag) || match[4] === '/' ? '>' : '>'}`;
 }
 
 function resolveMarkdownUrl(rawUrl, snapshot, route, filePath, isImage) {

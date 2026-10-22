@@ -2037,6 +2037,7 @@
       branch: '',
       defaultBranch: '',
       repoUpdated: '',
+      repoMetadata: null,
       repoDescription: '',
       repoHomepage: '',
       repoStars: 0,
@@ -3709,6 +3710,7 @@
     };
 
     const applyRepoInfoData = (data) => {
+      state.repoMetadata = data && typeof data === 'object' ? data : null;
       state.defaultBranch = data.default_branch || state.branch;
       state.repoUpdated = data.pushed_at || state.repoUpdated || '';
       state.repoDescription = data.description || '';
@@ -4089,13 +4091,15 @@
       if (saved) {
         const item = await ensureRepoPath(saved);
         if (item) {
-          selectFile(saved, '', silent ? 'none' : 'push');
+          if (state.currentFilePath === saved && typeof lastRawText === 'string') return;
+          await selectFile(saved, '', silent ? 'none' : 'push');
           return;
         }
       }
       const readme = Object.entries(state.rootNode.children).find(([name, item]) => item.type === 'blob' && README_RE.test(name));
       if (readme) {
-        selectFile(readme[1].path, anchor, silent ? 'none' : 'push');
+        if (state.currentFilePath === readme[1].path && typeof lastRawText === 'string') return;
+        await selectFile(readme[1].path, anchor, silent ? 'none' : 'push');
         return;
       }
       state.currentFilePath = '';
@@ -5005,11 +5009,15 @@
 
     const hydrateFromServerSnapshot = (route) => {
       const snapshot = SSR_BOOTSTRAP;
+      const ssrFile = snapshot?.ssrFile && route?.file &&
+        String(snapshot.ssrFile.path || '') === String(route.file) &&
+        String(route.branch || '') === String(snapshot.branch || '') &&
+        typeof snapshot.ssrFile.text === 'string' ? snapshot.ssrFile : null;
       if (!snapshot || snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.tree) ||
           !snapshot.owner || !snapshot.repo || !snapshot.branch ||
           snapshot.owner.toLowerCase() !== state.owner.toLowerCase() ||
           snapshot.repo.toLowerCase() !== state.repo.toLowerCase() ||
-          route?.branch || route?.file || route?.folder || route?.mode) return false;
+          ((route?.branch || route?.file || route?.folder || route?.mode) && !ssrFile)) return false;
 
       state.branch = snapshot.branch;
       state.cdnVersion = snapshot.branch;
@@ -5022,19 +5030,44 @@
       state.cdnVersion = snapshot.branch;
       mergeRecursiveTree(snapshot.tree, snapshot.treeSha || '');
       state.treeFullyLoaded = Boolean(snapshot.treeComplete);
-      state.currentFilePath = snapshot.readmePath || '';
+      if (!snapshot.treeComplete) {
+        const markFoldersUnloaded = (node) => {
+          for (const child of Object.values(node?.children || {})) {
+            if (child?.type === 'tree') { child.loaded = false; markFoldersUnloaded(child); }
+          }
+        };
+        markFoldersUnloaded(state.rootNode);
+      }
+      state.currentFilePath = ssrFile ? ssrFile.path : (snapshot.readmePath || '');
       state.currentFolderPath = '';
       state.activePanel = null;
       state.panelReturnPath = '';
-      lastRawText = typeof snapshot.readmeMarkdown === 'string' ? snapshot.readmeMarkdown : '';
+      lastRawText = ssrFile ? ssrFile.text : (typeof snapshot.readmeMarkdown === 'string' ? snapshot.readmeMarkdown : '');
       renderTree();
       updateRepoHeader();
       updateBranchControl();
       if (state.currentFilePath) {
-        setContentHeader(state.currentFilePath, extOf(state.currentFilePath));
-        updateActiveRow(state.currentFilePath);
+        const activePath = state.currentFilePath;
+        const activeExt = extOf(activePath);
+        setContentHeader(activePath, activeExt);
+        updateActiveRow(activePath);
         updateActiveFolder('');
-        wireServerRenderedMarkdown();
+        if (MARKDOWN_EXTS.includes(activeExt) && typeof lastRawText === 'string') {
+          // Re-render the SSR source with LiteGH's full marked + DOMPurify pipeline.
+          // This fixes raw HTML, entities and the richer GitHub-flavored Markdown cases
+          // that the deliberately small Worker renderer cannot fully represent.
+          const renderController = new AbortController();
+          void renderMarkdown(lastRawText, activePath, renderController.signal, parseHash().anchor)
+            .catch((error) => console.warn('LiteGH Markdown hydration failed:', error));
+        } else if (ssrFile && (activeExt === 'html' || activeExt === 'htm')) {
+          renderHtml(lastRawText, activeExt);
+        } else if (ssrFile && activeExt === 'svg') {
+          renderSvg(lastRawText, activePath.split('/').pop());
+        } else if (ssrFile) {
+          void renderCode(lastRawText, activeExt);
+        } else {
+          wireServerRenderedMarkdown();
+        }
       } else {
         setContentHeader('', '');
       }
@@ -5204,6 +5237,7 @@
       if (previousRepo !== nextRepo) {
         branchList = null;
         state.repoUpdated = '';
+        state.repoMetadata = null;
         state.repoLicense = '';
         state.repoArchived = false;
         clearFileMemoryCache();
