@@ -33,14 +33,20 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-const staleWhileRevalidate = async (request) => {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  const network = fetch(request).then((response) => {
-    if (response.ok) cache.put(request, response.clone());
+const staleWhileRevalidate = (request, event) => {
+  const cachePromise = caches.open(CACHE_NAME);
+  const network = cachePromise.then((cache) => fetch(request).then(async (response) => {
+    if (response.ok) await cache.put(request, response.clone());
     return response;
-  }).catch(() => null);
-  return cached || (await network) || Response.error();
+  })).catch(() => null);
+
+  // Register the background work synchronously while the fetch event is active.
+  event.waitUntil(network.then(() => undefined));
+  return (async () => {
+    const cache = await cachePromise;
+    const cached = await cache.match(request);
+    return cached || (await network) || Response.error();
+  })();
 };
 
 self.addEventListener('fetch', (event) => {
@@ -50,7 +56,7 @@ self.addEventListener('fetch', (event) => {
   const sameOrigin = url.origin === self.location.origin;
   const isGitHubData = url.hostname === 'api.github.com' || url.hostname === 'raw.githubusercontent.com';
   if (CDN_ASSETS.has(request.url)) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(staleWhileRevalidate(request, event));
     return;
   }
   if (sameOrigin && request.mode === 'navigate') {
@@ -64,6 +70,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (sameOrigin && !isGitHubData) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(staleWhileRevalidate(request, event));
   }
 });

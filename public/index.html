@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="LiteGH">
-  <!--<link rel="manifest" href="/manifest.webmanifest">-->
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="preconnect" href="https://api.github.com">
@@ -5053,12 +5053,13 @@
         updateActiveRow(activePath);
         updateActiveFolder('');
         if (MARKDOWN_EXTS.includes(activeExt) && typeof lastRawText === 'string') {
-          // Re-render the SSR source with LiteGH's full marked + DOMPurify pipeline.
-          // This fixes raw HTML, entities and the richer GitHub-flavored Markdown cases
-          // that the deliberately small Worker renderer cannot fully represent.
-          const renderController = new AbortController();
-          void renderMarkdown(lastRawText, activePath, renderController.signal, parseHash().anchor)
-            .catch((error) => console.warn('LiteGH Markdown hydration failed:', error));
+          if (!ssrFile && $('contentBody').querySelector('[data-ssr-readme]')) {
+            wireServerRenderedMarkdown();
+          } else {
+            const renderController = new AbortController();
+            void renderMarkdown(lastRawText, activePath, renderController.signal, parseHash().anchor)
+              .catch((error) => console.warn('LiteGH Markdown hydration failed:', error));
+          }
         } else if (ssrFile && (activeExt === 'html' || activeExt === 'htm')) {
           renderHtml(lastRawText, activeExt);
         } else if (ssrFile && activeExt === 'svg') {
@@ -5280,7 +5281,7 @@
       setupControls();
       await bootRepo();
     };
-/*
+
     let deferredInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
@@ -5306,7 +5307,7 @@
         });
       });
     }
-*/
+
     window.addEventListener('error', (event) => console.error('LiteGH error:', event.message));
     window.addEventListener('unhandledrejection', (event) => console.error('LiteGH unhandled rejection:', event.reason));
 

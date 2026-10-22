@@ -13,8 +13,29 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    if (request.method !== 'GET' && request.method !== 'HEAD') return serveAsset(request, env);
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return new Response('Method Not Allowed\n', {
+        status: 405,
+        headers: {
+          'Allow': 'GET, HEAD',
+          'Cache-Control': 'no-store',
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
 
+    if (isBundledStaticAsset(url.pathname)) {
+      if (env.ASSETS) return env.ASSETS.fetch(request);
+      return new Response('LiteGH static assets are unavailable. Configure the ASSETS binding.\n', {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
     const fileRoute = parseRepositoryFileRoute(url.pathname);
     if (fileRoute && isSsrTextPath(fileRoute.file)) {
       return handleTextFileRequest(request, env, ctx, fileRoute);
@@ -115,11 +136,15 @@ async function serveAsset(request, env) {
 
   // Deep GitHub-style routes are client-side LiteGH routes; return the app shell.
   if (isLiteGHClientRoute(pathname)) return serveShellWithoutSSR(request, env);
-
-  // Serve the assets bundled with this Worker, but preserve unrelated PHP/API
-  // endpoints and other origin routes by passing them through to the existing origin.
   if (env.ASSETS && isBundledStaticAsset(pathname)) return env.ASSETS.fetch(request);
-  return fetch(request);
+  return new Response(request.method === 'HEAD' ? null : 'Not Found\n', {
+    status: 404,
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Type': 'text/plain; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 function isLiteGHClientRoute(pathname) {
@@ -690,7 +715,7 @@ async function renderHtmlResponse(snapshot, route, request, env, cacheStatus) {
   const treeHtml = renderTreeMarkup(snapshot, route, snapshot.readmePath || '');
   const summaryHtml = renderRepoSummary(snapshot);
   const readmeHtml = snapshot.readmePath
-    ? `<article class="markdown-body ssr-markdown-body" data-ssr-readme="${escapeHtml(snapshot.readmePath)}">${renderMarkdownToHtml(snapshot.readmeMarkdown || '', snapshot, route, snapshot.readmePath)}</article>${snapshot.readmeTruncated ? '<div class="notice" role="status">This README preview is limited to 128 KiB on the server. LiteGH will try to load the complete file in the browser.</div>' : ''}`
+    ? `<article class="markdown-body ssr-markdown-body" data-ssr-readme="${escapeHtml(snapshot.readmePath)}">${renderMarkdownToHtml(snapshot.readmeMarkdown || '', snapshot, route, snapshot.readmePath)}</article>${snapshot.readmeTruncated ? '<div class="notice" role="status">This README preview is limited to 256 KiB on the server. LiteGH will try to load the complete file in the browser.</div>' : ''}`
     : `<div class="notice" role="status">No README was found in the default branch. Choose a file from the tree to view it.</div>`;
 
   let html = base;
@@ -736,7 +761,7 @@ function renderMarkdownResponse(snapshot, route, cacheStatus) {
     const size = item.type === 'blob' ? ` (${formatBytes(item.size || 0)})` : '';
     return `- [${label.replace(/\]/g, '\\]')}](${href})${size}`;
   }).join('\n');
-  const readme = snapshot.readmeMarkdown ? `\n\n## ${snapshot.readmePath}\n\n${snapshot.readmeMarkdown}${snapshot.readmeTruncated ? '\n\n> Note: this cached README is truncated to 128 KiB. Open the README file URL to retrieve the full source.' : ''}` : '\n\n_No README found in the default branch._';
+  const readme = snapshot.readmeMarkdown ? `\n\n## ${snapshot.readmePath}\n\n${snapshot.readmeMarkdown}${snapshot.readmeTruncated ? '\n\n> Note: this cached README is truncated to 256 KiB. Open the README file URL to retrieve the full source.' : ''}` : '\n\n_No README found in the default branch._';
   const markdown = [
     `# ${snapshot.owner}/${snapshot.repo}`,
     '',
