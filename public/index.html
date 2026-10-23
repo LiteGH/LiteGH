@@ -3241,7 +3241,20 @@
         const clean = src.split(/[?#]/, 1)[0];
         if (!clean) return;
         try {
-          img.src = await resolveMediaUrl(resolveRepoPath(clean, currentDir), signal);
+          const repoPath = resolveRepoPath(clean, currentDir);
+          if (!getToken() && !state.localMode) {
+            const cdnUrl = jsDelivrAssetUrl(repoPath);
+            img.dataset.cdnFallbackTried = '0';
+            img.onerror = async () => {
+              if (img.dataset.cdnFallbackTried === '1' || signal.aborted) return;
+              img.dataset.cdnFallbackTried = '1';
+              img.onerror = null;
+              try { img.src = await fetchFileBlob(repoPath, undefined, signal); } catch (_) {}
+            };
+            img.src = cdnUrl;
+          } else {
+            img.src = await resolveMediaUrl(repoPath, signal);
+          }
         } catch (_) {}
       };
 

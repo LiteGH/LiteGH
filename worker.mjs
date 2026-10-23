@@ -961,6 +961,15 @@ function renderInline(source, snapshot, route, filePath) {
     return token;
   };
   text = text.replace(/`([^`]+)`/g, (_, code) => stash(`<code>${escapeHtml(code)}</code>`));
+  text = text.replace(/\[!\[([^\]]*)\]\((\S+?)(?:\s+["'](.*?)["'])?\)\]\((\S+?)(?:\s+["'](.*?)["'])?\)/g, (_, alt, imageRawUrl, imageTitle = '', linkRawUrl, linkTitle = '') => {
+    const imageUrl = resolveMarkdownUrl(imageRawUrl, snapshot, route, filePath, true);
+    const linkUrl = resolveMarkdownUrl(linkRawUrl, snapshot, route, filePath, false);
+    if (!imageUrl || !linkUrl) return stash(escapeHtml(alt));
+    const fallback = /^(?:https?:)?\/\//i.test(imageRawUrl) || /^[a-z][a-z0-9+.-]*:/i.test(imageRawUrl) ? '' : rawUrlUrl(snapshot, filePath, imageRawUrl);
+    const external = /^https?:\/\//i.test(linkUrl) || linkUrl.startsWith('//');
+    const image = `<img src="${escapeHtml(imageUrl)}"${fallback ? ` data-fallback-src="${escapeHtml(fallback)}"` : ''} alt="${escapeHtml(alt)}"${imageTitle ? ` title="${escapeHtml(imageTitle)}"` : ''} loading="lazy" decoding="async">`;
+    return stash(`<a href="${escapeHtml(linkUrl)}"${external ? ' target="_blank" rel="noopener noreferrer"' : ''}${linkTitle ? ` title="${escapeHtml(linkTitle)}"` : ''}>${image}</a>`);
+  });
   text = text.replace(/!\[([^\]]*)\]\((\S+?)(?:\s+["'](.*?)["'])?\)/g, (_, alt, rawUrl, title = '') => {
     const url = resolveMarkdownUrl(rawUrl, snapshot, route, filePath, true);
     if (!url) return stash(escapeHtml(alt));
