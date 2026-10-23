@@ -3855,6 +3855,20 @@
 
       try {
         try {
+          const cacheResponse = await fetch('/__litegh/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ owner: requestedOwner, repo: requestedRepo }),
+            cache: 'no-store',
+          });
+          if (!cacheResponse.ok) {
+            console.warn(`LiteGH cache invalidation failed: ${cacheResponse.status}`);
+          }
+        } catch (error) {
+          console.warn('LiteGH cache invalidation failed; continuing with browser refresh.', error);
+        }
+
+        try {
           const purgeResponse = await fetch(purgeUrl, { cache: 'no-store' });
           if (!purgeResponse.ok) console.warn(`jsDelivr purge request failed: ${purgeResponse.status}`);
         } catch (error) {
